@@ -5,7 +5,9 @@ import Home from "./pages/Home";
 import LoginStartup from "./pages/LoginStartup";
 import LoginInvestor from "./pages/LoginInvestor";
 import LoginIncubator from "./pages/LoginIncubator";
-import StartupDash from "./pages/StartupDash";
+import InvestorDashboard from "./pages/InvestorDashboard";
+import IncubatorDashboard from "./pages/IncubatorDashboard";
+import StartupDashboard from "./pages/StartupDashboard";
 
 function App() {
   return (
@@ -17,7 +19,9 @@ function App() {
           <Route path="/login-startup" element={<LoginStartup />} />
           <Route path="/login-investor" element={<LoginInvestor />} />
           <Route path="/login-incubator" element={<LoginIncubator />} />
-          <Route path="/startup" element={<StartupDash/>} />
+          <Route path="/startup" element={<StartupDashboard/>} />
+          <Route path="/investor" element={<InvestorDashboard/>} />
+          <Route path="/incubator" element={<IncubatorDashboard/>} />
         </Routes>
       </div>
     </>
