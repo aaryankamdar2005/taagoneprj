@@ -8,6 +8,7 @@ import {
 const StartupDashboard = () => {
   const [activePage, setActivePage] = useState("dashboard");
 
+  // Dummy chart data
   const dealsData = [
     { name: "Jan", deals: 2 },
     { name: "Feb", deals: 5 },
@@ -21,12 +22,50 @@ const StartupDashboard = () => {
   ];
 
   const COLORS = ["#6366F1", "#FACC15"];
-  // Dashboard Home
-  const DashboardHome = () => (
+
+  // Portfolio
+  const [portfolioItems] = useState([
+    { id: 1, name: "Pitch Deck v1" },
+    { id: 2, name: "Financial Report Q1" },
+  ]);
+
+  // Pitch Videos
+  const [pitches, setPitches] = useState([
+    { id: 1, name: "Pitch Video 1", url: "https://www.w3schools.com/html/mov_bbb.mp4" },
+  ]);
+  const addPitch = () => {
+    const name = prompt("Enter pitch name");
+    const url = prompt("Enter video URL");
+    if(name && url) setPitches([...pitches, { id: Date.now(), name, url }]);
+  };
+  const deletePitch = (id) => setPitches(pitches.filter(p => p.id !== id));
+
+  // Tasks
+  const [tasks, setTasks] = useState(["Complete Prototype", "Reach 5 Investors"]);
+  const addTask = () => {
+    const task = prompt("Enter task");
+    if(task) setTasks([...tasks, task]);
+  };
+  const deleteTask = (index) => setTasks(tasks.filter((_, i) => i !== index));
+
+  // Soft Commitments
+  const [softCommitments, setSoftCommitments] = useState(["Investor Beta - Interested"]);
+  const addCommitment = () => {
+    const c = prompt("Enter commitment");
+    if(c) setSoftCommitments([...softCommitments, c]);
+  };
+  const deleteCommitment = (index) => setSoftCommitments(softCommitments.filter((_, i) => i !== index));
+
+  // Interested Investors / Incubators
+  const interested = ["Investor A – FinTech", "Incubator X – Early Stage"];
+
+  // All Incubators
+  const incubators = ["Incubator Delta – Seed Stage", "Incubator Gamma – Growth"];
+
+  // Dashboard Component
+  const Dashboard = () => (
     <div>
       <h2 className="text-2xl font-semibold mb-6">Startup Overview</h2>
-
-      {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white p-6 rounded-xl shadow flex items-center space-x-4">
           <DollarSign className="text-green-500 w-8 h-8" />
@@ -51,9 +90,7 @@ const StartupDashboard = () => {
         </div>
       </div>
 
-      {/* Charts Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Bar Chart */}
         <div className="bg-white p-6 rounded-xl shadow">
           <h3 className="text-lg font-semibold mb-4">Deals Over Time</h3>
           <ResponsiveContainer width="100%" height={300}>
@@ -67,10 +104,8 @@ const StartupDashboard = () => {
             </BarChart>
           </ResponsiveContainer>
         </div>
-
-        {/* Pie Chart */}
         <div className="bg-white p-6 rounded-xl shadow">
-          <h3 className="text-lg font-semibold mb-4">Connections</h3>
+          <h3 className="text-lg font-semibold mb-4">Connections Distribution</h3>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
@@ -86,8 +121,8 @@ const StartupDashboard = () => {
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Legend />
               <Tooltip />
+              <Legend />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -95,88 +130,38 @@ const StartupDashboard = () => {
     </div>
   );
 
-  // Interested Investors & Incubators
-  const InterestedConnections = () => (
+  // Portfolio
+  const Portfolio = () => (
     <div>
-      <h2 className="text-2xl font-semibold mb-4">Interested Investors & Incubators</h2>
+      <h2 className="text-2xl font-semibold mb-4">Portfolio</h2>
       <ul className="space-y-3">
-        {["Investor A – FinTech Focus", "Incubator X – Early Stage", "Investor B – Healthcare"].map(
-          (name, i) => (
-            <li
-              key={i}
-              className="bg-white p-4 shadow rounded flex justify-between items-center"
-            >
-              <span>{name}</span>
-              <button className="px-4 py-2 bg-yellow-400 rounded hover:bg-yellow-500 transition">
-                View
-              </button>
-            </li>
-          )
-        )}
+        {portfolioItems.map((item) => (
+          <li key={item.id} className="bg-white p-4 rounded shadow flex justify-between items-center">
+            <span>{item.name}</span>
+            <button className="px-4 py-2 bg-yellow-400 rounded hover:bg-yellow-500 transition">
+              Download
+            </button>
+          </li>
+        ))}
       </ul>
     </div>
   );
 
-  // All Investors & Incubators
-  const AllConnections = () => (
+  // Pitch
+  const Pitch = () => (
     <div>
-      <h2 className="text-2xl font-semibold mb-4">All Investors & Incubators</h2>
-      <div className="grid md:grid-cols-2 gap-4">
-        {[
-          "Investor Alpha – EdTech",
-          "Investor Beta – AI/ML",
-          "Incubator Delta – Seed Stage",
-          "Incubator Gamma – Growth",
-        ].map((name, i) => (
-          <div
-            key={i}
-            className="bg-white p-4 rounded shadow flex justify-between items-center"
-          >
-            <span>{name}</span>
-            <button className="px-4 py-2 bg-yellow-400 rounded hover:bg-yellow-500 transition">
-              View
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  // Pitch Video
-  const PitchVideo = () => (
-    <div>
-      <h2 className="text-2xl font-semibold mb-4">Pitch Video</h2>
-      <div className="bg-white p-6 rounded shadow w-full max-w-lg">
-        <input type="file" accept="video/*" className="mb-4" />
-        <video controls className="w-full rounded">
-          <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4" />
-          Your browser does not support video playback.
-        </video>
-      </div>
-    </div>
-  );
-
-  // Saved Deals
-  const SavedDeals = () => (
-    <div>
-      <h2 className="text-2xl font-semibold mb-4">Saved Deals</h2>
+      <h2 className="text-2xl font-semibold mb-4">Pitch Videos</h2>
+      <button onClick={addPitch} className="mb-4 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+        Add Pitch
+      </button>
       <ul className="space-y-3">
-        {[
-          "Deal with Investor Alpha – $20,000",
-          "Deal with Incubator Delta – 6 Month Program",
-        ].map((deal, i) => (
-          <li
-            key={i}
-            className="bg-white p-4 rounded shadow flex justify-between items-center"
-          >
-            <span>{deal}</span>
+        {pitches.map((p) => (
+          <li key={p.id} className="bg-white p-4 rounded shadow flex justify-between items-center">
+            <span>{p.name}</span>
             <div className="flex gap-2">
-              <button className="px-4 py-2 bg-yellow-400 rounded hover:bg-yellow-500 transition">
-                View
-              </button>
-              <button className="px-4 py-2 bg-red-400 text-white rounded hover:bg-red-500 transition">
-                Remove
-              </button>
+              <a href={p.url} target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-green-400 rounded hover:bg-green-500 transition">View</a>
+              <button className="px-4 py-2 bg-yellow-400 rounded hover:bg-yellow-500 transition">Download</button>
+              <button onClick={() => deletePitch(p.id)} className="px-4 py-2 bg-red-400 text-white rounded hover:bg-red-500 transition">Delete</button>
             </div>
           </li>
         ))}
@@ -184,65 +169,59 @@ const StartupDashboard = () => {
     </div>
   );
 
-  // Current Deals
-  const CurrentDeals = () => (
+  // Tasks
+  const Tasks = () => (
     <div>
-      <h2 className="text-2xl font-semibold mb-4">Current Deals</h2>
-      <table className="w-full bg-white rounded shadow text-left">
-        <thead>
-          <tr className="border-b">
-            <th className="p-3">Partner</th>
-            <th className="p-3">Type</th>
-            <th className="p-3">Amount</th>
-            <th className="p-3">Status</th>
-            <th className="p-3">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr className="border-b hover:bg-gray-50">
-            <td className="p-3">Investor Beta</td>
-            <td className="p-3">Investor</td>
-            <td className="p-3">$30,000</td>
-            <td className="p-3 text-green-600">Ongoing</td>
-            <td className="p-3">
-              <button className="px-3 py-1 bg-yellow-400 rounded hover:bg-yellow-500 transition">
-                View
-              </button>
-            </td>
-          </tr>
-          <tr className="hover:bg-gray-50">
-            <td className="p-3">Incubator Gamma</td>
-            <td className="p-3">Incubator</td>
-            <td className="p-3">Equity Support</td>
-            <td className="p-3 text-yellow-600">Negotiation</td>
-            <td className="p-3">
-              <button className="px-3 py-1 bg-yellow-400 rounded hover:bg-yellow-500 transition">
-                View
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <h2 className="text-2xl font-semibold mb-4">Tasks</h2>
+      <button onClick={addTask} className="mb-4 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Add Task</button>
+      <ul className="space-y-3">
+        {tasks.map((t, i) => (
+          <li key={i} className="bg-white p-4 rounded shadow flex justify-between items-center">
+            <span>{t}</span>
+            <button onClick={() => deleteTask(i)} className="px-4 py-2 bg-red-400 text-white rounded hover:bg-red-500 transition">Delete</button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 
-  // Settings
-  const SettingsPage = () => (
+  // Soft Commitments
+  const SoftCommitments = () => (
     <div>
-      <h2 className="text-2xl font-semibold mb-4">Settings</h2>
-      <form className="bg-white p-6 rounded-lg shadow mt-4 space-y-4 w-96">
-        <div>
-          <label className="block text-gray-700 mb-1">Startup Name</label>
-          <input type="text" placeholder="My Startup" className="border rounded px-3 py-2 w-full" />
-        </div>
-        <div>
-          <label className="block text-gray-700 mb-1">Email</label>
-          <input type="email" placeholder="founder@email.com" className="border rounded px-3 py-2 w-full" />
-        </div>
-        <button className="bg-indigo-600 text-white px-4 py-2 rounded shadow hover:bg-indigo-700">
-          Save Changes
-        </button>
-      </form>
+      <h2 className="text-2xl font-semibold mb-4">Soft Commitments</h2>
+      <button onClick={addCommitment} className="mb-4 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Add Commitment</button>
+      <ul className="space-y-3">
+        {softCommitments.map((c, i) => (
+          <li key={i} className="bg-white p-4 rounded shadow flex justify-between items-center">
+            <span>{c}</span>
+            <button onClick={() => deleteCommitment(i)} className="px-4 py-2 bg-red-400 text-white rounded hover:bg-red-500 transition">Delete</button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+
+  // Incubators
+  const Incubators = () => (
+    <div>
+      <h2 className="text-2xl font-semibold mb-4">Incubators</h2>
+      <ul className="space-y-3">
+        {incubators.map((i, idx) => (
+          <li key={idx} className="bg-white p-4 rounded shadow">{i}</li>
+        ))}
+      </ul>
+    </div>
+  );
+
+  // Interested
+  const Interested = () => (
+    <div>
+      <h2 className="text-2xl font-semibold mb-4">Interested Investors & Incubators</h2>
+      <ul className="space-y-3">
+        {interested.map((i, idx) => (
+          <li key={idx} className="bg-white p-4 rounded shadow">{i}</li>
+        ))}
+      </ul>
     </div>
   );
 
@@ -253,24 +232,24 @@ const StartupDashboard = () => {
         <h1 className="text-2xl font-bold text-indigo-600 mb-8">Startup</h1>
         <ul className="space-y-4">
           <li className={`cursor-pointer ${activePage === "dashboard" ? "text-indigo-600 font-semibold" : "text-gray-700"} hover:text-indigo-600`} onClick={() => setActivePage("dashboard")}>Dashboard</li>
-          <li className={`cursor-pointer ${activePage === "interested" ? "text-indigo-600 font-semibold" : "text-gray-700"} hover:text-indigo-600`} onClick={() => setActivePage("interested")}>Interested Investors & Incubators</li>
-          <li className={`cursor-pointer ${activePage === "all" ? "text-indigo-600 font-semibold" : "text-gray-700"} hover:text-indigo-600`} onClick={() => setActivePage("all")}>All Investors & Incubators</li>
-          <li className={`cursor-pointer ${activePage === "pitch" ? "text-indigo-600 font-semibold" : "text-gray-700"} hover:text-indigo-600`} onClick={() => setActivePage("pitch")}>Pitch Video</li>
-          <li className={`cursor-pointer ${activePage === "saved" ? "text-indigo-600 font-semibold" : "text-gray-700"} hover:text-indigo-600`} onClick={() => setActivePage("saved")}>Saved Deals</li>
-          <li className={`cursor-pointer ${activePage === "current" ? "text-indigo-600 font-semibold" : "text-gray-700"} hover:text-indigo-600`} onClick={() => setActivePage("current")}>Current Deals</li>
-          <li className={`cursor-pointer ${activePage === "settings" ? "text-indigo-600 font-semibold" : "text-gray-700"} hover:text-indigo-600`} onClick={() => setActivePage("settings")}>Settings</li>
+          <li className={`cursor-pointer ${activePage === "portfolio" ? "text-indigo-600 font-semibold" : "text-gray-700"} hover:text-indigo-600`} onClick={() => setActivePage("portfolio")}>Portfolio</li>
+          <li className={`cursor-pointer ${activePage === "pitch" ? "text-indigo-600 font-semibold" : "text-gray-700"} hover:text-indigo-600`} onClick={() => setActivePage("pitch")}>Pitch</li>
+          <li className={`cursor-pointer ${activePage === "tasks" ? "text-indigo-600 font-semibold" : "text-gray-700"} hover:text-indigo-600`} onClick={() => setActivePage("tasks")}>Tasks</li>
+          <li className={`cursor-pointer ${activePage === "soft" ? "text-indigo-600 font-semibold" : "text-gray-700"} hover:text-indigo-600`} onClick={() => setActivePage("soft")}>Soft Commitments</li>
+          <li className={`cursor-pointer ${activePage === "incubators" ? "text-indigo-600 font-semibold" : "text-gray-700"} hover:text-indigo-600`} onClick={() => setActivePage("incubators")}>Incubators</li>
+          <li className={`cursor-pointer ${activePage === "interested" ? "text-indigo-600 font-semibold" : "text-gray-700"} hover:text-indigo-600`} onClick={() => setActivePage("interested")}>Interested</li>
         </ul>
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 p-6 overflow-y-auto">
-        {activePage === "dashboard" && <DashboardHome />}
-        {activePage === "interested" && <InterestedConnections />}
-        {activePage === "all" && <AllConnections />}
-        {activePage === "pitch" && <PitchVideo />}
-        {activePage === "saved" && <SavedDeals />}
-        {activePage === "current" && <CurrentDeals />}
-        {activePage === "settings" && <SettingsPage />}
+        {activePage === "dashboard" && <Dashboard />}
+        {activePage === "portfolio" && <Portfolio />}
+        {activePage === "pitch" && <Pitch />}
+        {activePage === "tasks" && <Tasks />}
+        {activePage === "soft" && <SoftCommitments />}
+        {activePage === "incubators" && <Incubators />}
+        {activePage === "interested" && <Interested />}
       </main>
     </div>
   );
