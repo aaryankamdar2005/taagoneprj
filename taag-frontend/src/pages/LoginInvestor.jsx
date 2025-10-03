@@ -61,7 +61,7 @@ const LoginInvestor = () => {
         localStorage.setItem('phoneNumber', data.user.phoneNumber);
         
         // Navigate to investor dashboard
-        navigate('/investor/dashboard');
+        navigate('/investor/');
       } else {
         setError(data.message || 'Login failed');
       }

@@ -61,7 +61,7 @@ const LoginIncubator = () => {
         localStorage.setItem('phoneNumber', data.user.phoneNumber);
         
         // Navigate to incubator dashboard
-        navigate('/incubator/dashboard');
+        navigate('/incubator/');
       } else {
         setError(data.message || 'Login failed');
       }

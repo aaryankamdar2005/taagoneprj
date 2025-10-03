@@ -61,7 +61,7 @@ function LoginStartup() {
         localStorage.setItem('phoneNumber', data.user.phoneNumber);
         
         // Navigate to startup dashboard
-        navigate('/startup/dashboard');
+        navigate('/startup/');
       } else {
         setError(data.message || 'Login failed');
       }
