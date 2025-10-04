@@ -7,6 +7,7 @@ const startupRoutes = require('./routes/startup');
 const investorRoutes = require('./routes/investor'); 
 const incubatorRoutes = require('./routes/incubator');// Add this
 const mentorRoutes = require('./routes/mentor');
+const chatRoutes = require('./routes/chat');
 const app = express();
 
 // Basic middleware
@@ -23,6 +24,7 @@ app.use('/api/startup', startupRoutes);
 app.use('/api/investor', investorRoutes);
 app.use('/api/incubator', incubatorRoutes); // Add this
 app.use('/api/mentor', mentorRoutes); 
+app.use('/api/chat', chatRoutes);
 // Basic routes
 app.get('/', (req, res) => {
   res.json({ 

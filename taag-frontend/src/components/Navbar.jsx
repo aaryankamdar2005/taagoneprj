@@ -21,6 +21,7 @@ function Navbar() {
         <Link to="/login-incubator" className="hover:text-black transition">
           Incubators
         </Link>
+        
       </div>
 
       {/* Right: Login button */}

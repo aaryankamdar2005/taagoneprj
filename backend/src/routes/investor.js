@@ -94,4 +94,6 @@ router.get('/startups/:startupId', investorController.getStartupDetails);
 router.post('/startups/:startupId/intro-request', investorController.requestIntroduction);
 router.post('/startups/:startupId/soft-commit', investorController.makeSoftCommitment);
 
+router.post('/commitments/:commitmentId/convert', investorController.convertCommitmentToInvestment);
+router.post('/commitments/:commitmentId/withdraw', investorController.withdrawCommitment);
 module.exports = router;

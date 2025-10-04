@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Users, DollarSign, BarChart3, Calendar, FileText, Building2, CheckCircle2 } from "lucide-react";
+import { Users, DollarSign, BarChart3, Calendar, FileText, Building2, CheckCircle2, MessageCircle } from "lucide-react";
 
-
-// Authenticated fetch helper
+// Authenticated fetch helper - WITH ERROR DETAILS
 const fetchWithAuth = async (url, opts = {}) => {
   const token = localStorage.getItem("token");
   const res = await fetch(url, {
@@ -10,14 +9,34 @@ const fetchWithAuth = async (url, opts = {}) => {
     headers: {
       ...opts.headers,
       Authorization: `Bearer ${token}`,
-      "Content-Type": opts.method && opts.method !== "GET" ? "application/json" : undefined
+      "Content-Type": "application/json"
     }
   });
+  
   const contentType = res.headers.get("content-type") || "";
-  if (contentType.includes("json")) return await res.json();
+  
+  if (!res.ok) {
+    let errorMessage = `HTTP ${res.status}: ${res.statusText}`;
+    
+    if (contentType.includes("json")) {
+      const errorData = await res.json();
+      console.error('API Error Response:', errorData);
+      errorMessage = errorData.message || errorData.error || errorMessage;
+    } else {
+      const errorText = await res.text();
+      console.error('API Error Text:', errorText);
+      errorMessage = errorText || errorMessage;
+    }
+    
+    throw new Error(errorMessage);
+  }
+  
+  if (contentType.includes("json")) {
+    return await res.json();
+  }
+  
   throw new Error(await res.text());
 };
-
 
 const StartupDashboard = () => {
   const [activePage, setActivePage] = useState("dashboard");
@@ -35,12 +54,17 @@ const StartupDashboard = () => {
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
+  // Chat state
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatList, setChatList] = useState([]);
+  const [activeChat, setActiveChat] = useState(null);
+  const [activeChatMessages, setActiveChatMessages] = useState([]);
+  const [inputMessage, setInputMessage] = useState("");
 
   // Load initial data
   useEffect(() => {
     loadData();
   }, []);
-
 
   const loadData = async () => {
     try {
@@ -65,6 +89,78 @@ const StartupDashboard = () => {
     }
   };
 
+  // Chat functions
+  const loadChats = async () => {
+    try {
+      const res = await fetchWithAuth("http://localhost:5000/api/chat/chats");
+      setChatList((res.data || res).chats || []);
+    } catch (e) {
+      console.error('Error loading chats:', e);
+    }
+  };
+
+  const openChat = async (investorId) => {
+    try {
+      const res = await fetchWithAuth("http://localhost:5000/api/chat/chats", {
+        method: "POST",
+        body: JSON.stringify({ investorId })
+      });
+      
+      const chat = res.data || res;
+      setActiveChat(chat);
+      await loadChatMessages(chat._id);
+      setChatOpen(true);
+      await loadChats();
+    } catch (e) {
+      setError("Could not open chat: " + (e.message || String(e)));
+    }
+  };
+  // Open chat with incubator
+const openChatWithIncubator = async (incubatorId) => {
+  try {
+    const res = await fetchWithAuth("http://localhost:5000/api/chat/chats", {
+      method: "POST",
+      body: JSON.stringify({ incubatorId })
+    });
+    
+    const chat = res.data || res;
+    setActiveChat(chat);
+    await loadChatMessages(chat._id);
+    setChatOpen(true);
+    await loadChats();
+  } catch (e) {
+    setError("Could not open chat: " + (e.message || String(e)));
+  }
+};
+
+
+
+  const loadChatMessages = async (chatId) => {
+    try {
+      const res = await fetchWithAuth(`http://localhost:5000/api/chat/chats/${chatId}/messages`);
+      const data = res.data || res;
+      setActiveChatMessages(data.messages || []);
+    } catch (e) {
+      console.error('Error loading messages:', e);
+    }
+  };
+
+  const sendChatMessage = async () => {
+    if (!inputMessage.trim() || !activeChat) return;
+    
+    try {
+      await fetchWithAuth(`http://localhost:5000/api/chat/chats/${activeChat._id}/messages`, {
+        method: "POST",
+        body: JSON.stringify({ message: inputMessage })
+      });
+      
+      setInputMessage("");
+      await loadChatMessages(activeChat._id);
+      await loadChats();
+    } catch (e) {
+      setError("Could not send message: " + (e.message || String(e)));
+    }
+  };
 
   // Dashboard Section
   const Dashboard = () => (
@@ -94,7 +190,6 @@ const StartupDashboard = () => {
         </div>
       </div>
 
-
       {/* Recent Activity */}
       <div className="bg-white p-6 rounded-xl shadow mb-6">
         <h3 className="text-lg font-semibold mb-4">Recent Investor Activity</h3>
@@ -102,11 +197,20 @@ const StartupDashboard = () => {
           <ul className="space-y-3">
             {dashboard.investorActivity.slice(0, 5).map((activity, idx) => (
               <li key={idx} className="flex justify-between items-center border-b pb-2">
-                <div>
+                <div className="flex-1">
                   <p className="font-semibold">{activity.investorName}</p>
                   <p className="text-sm text-gray-600">{activity.activityType}</p>
                 </div>
-                <p className="text-sm text-gray-500">{new Date(activity.date).toLocaleDateString()}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-gray-500">{new Date(activity.date).toLocaleDateString()}</p>
+                  <button
+                    onClick={() => openChat(activity.investorId)}
+                    className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-sm flex items-center gap-1"
+                  >
+                    <MessageCircle size={14} />
+                    Chat
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -114,7 +218,6 @@ const StartupDashboard = () => {
           <p className="text-gray-500">No investor activity yet</p>
         )}
       </div>
-
 
       {/* Fundraising Progress */}
       <div className="bg-white p-6 rounded-xl shadow">
@@ -137,13 +240,11 @@ const StartupDashboard = () => {
     </div>
   );
 
-
   // Pitch Section
   const handlePitchChange = (e) => {
     const { name, value } = e.target;
     setPitchForm({ ...pitchForm, [name]: value });
   };
-
 
   const updatePitch = async () => {
     try {
@@ -161,7 +262,6 @@ const StartupDashboard = () => {
       setError("Could not update pitch: " + (err.message || String(err)));
     }
   };
-
 
   const PitchSection = () => (
     <div>
@@ -207,13 +307,11 @@ const StartupDashboard = () => {
     </div>
   );
 
-
   // Tasks Section
   const handleTaskChange = (e) => {
     const { name, value } = e.target;
     setTaskForm({ ...taskForm, [name]: value });
   };
-
 
   const addTask = async () => {
     try {
@@ -231,7 +329,6 @@ const StartupDashboard = () => {
     }
   };
 
-
   const updateTaskStatus = async (taskId, status) => {
     try {
       setError("");
@@ -246,7 +343,6 @@ const StartupDashboard = () => {
       setError("Could not update task: " + (err.message || String(err)));
     }
   };
-
 
   const TaskSection = () => (
     <div>
@@ -298,7 +394,6 @@ const StartupDashboard = () => {
         </button>
       </div>
 
-
       {/* Tasks List */}
       <div className="bg-white p-6 rounded-xl shadow">
         <h3 className="text-lg font-semibold mb-4">Your Tasks</h3>
@@ -346,8 +441,7 @@ const StartupDashboard = () => {
     </div>
   );
 
-
-  // Intro Requests Section - COMPLETE VERSION
+  // Intro Requests Section with Chat
   const respondToIntro = async (requestId, status, meetingDate = null) => {
     try {
       setError("");
@@ -368,7 +462,6 @@ const StartupDashboard = () => {
       setError("Could not respond to intro: " + (err.message || String(err)));
     }
   };
-
 
   const IntroRequestsSection = () => (
     <div>
@@ -425,6 +518,13 @@ const StartupDashboard = () => {
                     >
                       Decline
                     </button>
+                    <button
+                      onClick={() => openChat(intro.investorId)}
+                      className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition text-sm flex items-center gap-1"
+                    >
+                      <MessageCircle size={16} />
+                      Chat
+                    </button>
                   </div>
                 )}
 
@@ -443,8 +543,7 @@ const StartupDashboard = () => {
     </div>
   );
 
-
-  // Soft Commitments Section
+  // Soft Commitments Section with Chat
   const respondToCommitment = async (commitmentId, action) => {
     try {
       setError("");
@@ -466,7 +565,6 @@ const StartupDashboard = () => {
         body: JSON.stringify(body)
       });
       
-      // Reload data to reflect changes
       const commitsRes = await fetchWithAuth("http://localhost:5000/api/startup/soft-commitments");
       setCommitments((commitsRes.data || commitsRes).commitments || []);
       
@@ -476,7 +574,6 @@ const StartupDashboard = () => {
       setError("Could not respond to commitment: " + (err.message || String(err)));
     }
   };
-
 
   const SoftCommitmentsSection = () => (
     <div>
@@ -551,6 +648,13 @@ const StartupDashboard = () => {
                       >
                         Decline
                       </button>
+                      <button
+                        onClick={() => openChat(commit.investorId)}
+                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-sm flex items-center gap-1"
+                      >
+                        <MessageCircle size={16} />
+                        Chat
+                      </button>
                     </div>
                   )}
                 </div>
@@ -564,13 +668,11 @@ const StartupDashboard = () => {
     </div>
   );
 
-
   // Incubators Section
   const handleApplicationChange = (e) => {
     const { name, value } = e.target;
     setApplicationForm({ ...applicationForm, [name]: value });
   };
-
 
   const applyToIncubator = async (incubatorId) => {
     try {
@@ -583,7 +685,6 @@ const StartupDashboard = () => {
       setSelectedIncubator(null);
       setApplicationForm({});
       
-      // Reload applications
       const appsRes = await fetchWithAuth("http://localhost:5000/api/startup/applications");
       setApplications((appsRes.data || appsRes).applications || []);
       
@@ -594,134 +695,74 @@ const StartupDashboard = () => {
     }
   };
 
-
-  const IncubatorsSection = () => (
-    <div>
-      <h2 className="text-2xl font-semibold mb-4">Available Incubators</h2>
-      
-      {selectedIncubator ? (
-        <div className="bg-white p-6 rounded-xl shadow">
-          <h3 className="text-xl font-semibold mb-4">Apply to {selectedIncubator.incubatorName}</h3>
-          <div className="space-y-4 mb-4">
-            <div>
-              <label className="block font-semibold mb-1">Why do you want to join this program?</label>
-              <textarea
-                name="whyJoinProgram"
-                value={applicationForm.whyJoinProgram || ""}
-                onChange={handleApplicationChange}
-                className="border border-gray-300 p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                rows="3"
-                required
-              />
-            </div>
-            <div>
-              <label className="block font-semibold mb-1">Expected Outcomes</label>
-              <textarea
-                name="expectedOutcomes"
-                value={applicationForm.expectedOutcomes || ""}
-                onChange={handleApplicationChange}
-                className="border border-gray-300 p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                rows="3"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold mb-1">Current Challenges</label>
-              <textarea
-                name="currentChallenges"
-                value={applicationForm.currentChallenges || ""}
-                onChange={handleApplicationChange}
-                className="border border-gray-300 p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                rows="3"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold mb-1">Funding Needs</label>
-              <input
-                type="text"
-                name="fundingNeeds"
-                value={applicationForm.fundingNeeds || ""}
-                onChange={handleApplicationChange}
-                className="border border-gray-300 p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold mb-1">Time Commitment Available</label>
-              <input
-                type="text"
-                name="timeCommitment"
-                value={applicationForm.timeCommitment || ""}
-                onChange={handleApplicationChange}
-                className="border border-gray-300 p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => applyToIncubator(selectedIncubator._id)}
-              className="px-6 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
-            >
-              Submit Application
-            </button>
-            <button
-              onClick={() => {
-                setSelectedIncubator(null);
-                setApplicationForm({});
-              }}
-              className="px-6 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {incubators.map((incubator) => (
-            <div key={incubator._id} className="bg-white p-6 rounded-xl shadow">
-              <div className="flex items-start gap-4 mb-4">
-                {incubator.logoUrl && (
-                  <img
-                    src={incubator.logoUrl}
-                    alt={incubator.incubatorName}
-                    className="w-16 h-16 object-cover rounded"
-                  />
-                )}
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold">{incubator.incubatorName}</h3>
-                  <p className="text-sm text-gray-600">{incubator.location}</p>
-                </div>
+ // Update the IncubatorsSection to include chat button
+const IncubatorsSection = () => (
+  <div>
+    <h2 className="text-2xl font-semibold mb-4">Available Incubators</h2>
+    
+    {selectedIncubator ? (
+      // ... existing application form code ...
+      <div className="bg-white p-6 rounded-xl shadow">
+        {/* ... existing form ... */}
+      </div>
+    ) : (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {incubators.map((incubator) => (
+          <div key={incubator._id} className="bg-white p-6 rounded-xl shadow">
+            <div className="flex items-start gap-4 mb-4">
+              {incubator.logoUrl && (
+                <img
+                  src={incubator.logoUrl}
+                  alt={incubator.incubatorName}
+                  className="w-16 h-16 object-cover rounded"
+                />
+              )}
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold">{incubator.incubatorName}</h3>
+                <p className="text-sm text-gray-600">{incubator.location}</p>
               </div>
-              
-              <p className="text-sm text-gray-700 mb-4">{incubator.description}</p>
-              
-              <div className="space-y-2 mb-4 text-sm">
-                {incubator.programDetails?.duration && (
-                  <p><span className="font-semibold">Duration:</span> {incubator.programDetails.duration}</p>
-                )}
-                {incubator.programDetails?.equityTaken && (
-                  <p><span className="font-semibold">Equity:</span> {incubator.programDetails.equityTaken}%</p>
-                )}
-                {incubator.programDetails?.investmentAmount && (
-                  <p><span className="font-semibold">Investment:</span> ₹{incubator.programDetails.investmentAmount.toLocaleString()}</p>
-                )}
-              </div>
+            </div>
+            
+            <p className="text-sm text-gray-700 mb-4">{incubator.description}</p>
+            
+            <div className="space-y-2 mb-4 text-sm">
+              {incubator.programDetails?.duration && (
+                <p><span className="font-semibold">Duration:</span> {incubator.programDetails.duration}</p>
+              )}
+              {incubator.programDetails?.equityTaken && (
+                <p><span className="font-semibold">Equity:</span> {incubator.programDetails.equityTaken}%</p>
+              )}
+              {incubator.programDetails?.investmentAmount && (
+                <p><span className="font-semibold">Investment:</span> ₹{incubator.programDetails.investmentAmount.toLocaleString()}</p>
+              )}
+            </div>
 
-              <div className="flex gap-4 text-sm text-gray-600 mb-4">
-                <span>{incubator.stats?.activeStartups || 0} Startups</span>
-                <span>{incubator.stats?.activeMentors || 0} Mentors</span>
-              </div>
+            <div className="flex gap-4 text-sm text-gray-600 mb-4">
+              <span>{incubator.stats?.activeStartups || 0} Startups</span>
+              <span>{incubator.stats?.activeMentors || 0} Mentors</span>
+            </div>
 
+            <div className="flex gap-2">
               <button
                 onClick={() => setSelectedIncubator(incubator)}
-                className="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
               >
                 Apply Now
               </button>
+              <button
+                onClick={() => openChatWithIncubator(incubator._id)}
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition flex items-center gap-1"
+              >
+                <MessageCircle size={16} />
+                Chat
+              </button>
             </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+);
 
 
   // Applications Section
@@ -796,6 +837,141 @@ const StartupDashboard = () => {
     </div>
   );
 
+  // Chat Component with auto-refresh
+  const ChatBox = () => {
+    useEffect(() => {
+      if (chatOpen && !activeChat) {
+        loadChats();
+      }
+    }, [chatOpen]);
+
+    useEffect(() => {
+      let interval;
+      if (chatOpen && activeChat) {
+        interval = setInterval(() => {
+          loadChatMessages(activeChat._id);
+        }, 5000);
+      }
+      return () => clearInterval(interval);
+    }, [chatOpen, activeChat]);
+
+    if (!activeChat) {
+      return (
+        <div className="fixed bottom-4 right-4 w-80 bg-white shadow-2xl rounded-xl flex flex-col h-96 z-50 border border-gray-200">
+          <div className="flex items-center justify-between p-4 border-b bg-indigo-600 text-white rounded-t-xl">
+            <h3 className="font-semibold text-lg flex items-center gap-2">
+              <MessageCircle size={20} />
+              Messages
+            </h3>
+            <button className="text-white font-bold hover:bg-indigo-700 rounded px-2" onClick={() => setChatOpen(false)}>✕</button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3">
+            {chatList.length > 0 ? (
+              <div className="space-y-2">
+                {chatList.map((chat) => (
+                  <div
+                    key={chat._id}
+                    onClick={() => {
+                      setActiveChat(chat);
+                      loadChatMessages(chat._id);
+                    }}
+                    className="p-3 hover:bg-gray-100 rounded cursor-pointer transition"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate">{chat.participant.name}</p>
+                        <p className="text-xs text-gray-500 truncate">{chat.lastMessage || 'No messages yet'}</p>
+                      </div>
+                      {chat.unreadCount > 0 && (
+                        <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 font-semibold">
+                          {chat.unreadCount}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center mt-10">
+                <MessageCircle size={48} className="mx-auto text-gray-300 mb-3" />
+                <p className="text-gray-500">No conversations yet</p>
+                <p className="text-xs text-gray-400 mt-1">Start chatting with investors!</p>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="fixed bottom-4 right-4 w-96 bg-white shadow-2xl rounded-xl flex flex-col h-[500px] z-50 border border-gray-200">
+        <div className="flex items-center justify-between p-4 border-b bg-indigo-600 text-white rounded-t-xl">
+          <button 
+            onClick={() => {
+              setActiveChat(null);
+              setActiveChatMessages([]);
+            }}
+            className="text-white hover:bg-indigo-700 rounded px-2"
+          >
+            ← Back
+          </button>
+          <h3 className="font-semibold text-lg">
+            {activeChat.participant?.name}
+          </h3>
+          <button className="text-white font-bold hover:bg-indigo-700 rounded px-2" onClick={() => {
+            setChatOpen(false);
+            setActiveChat(null);
+            setActiveChatMessages([]);
+          }}>✕</button>
+        </div>
+        <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-gray-50">
+          {activeChatMessages.length > 0 ? (
+            activeChatMessages.map((msg, i) => (
+              <div
+                key={i}
+                className={`flex ${msg.senderType === 'startup' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[70%] p-3 rounded-lg ${
+                    msg.senderType === 'startup'
+                      ? 'bg-indigo-600 text-white rounded-br-none'
+                      : 'bg-white text-gray-800 rounded-bl-none shadow'
+                  }`}
+                >
+                  <p className="text-sm break-words">{msg.message}</p>
+                  <p className={`text-xs mt-1 ${msg.senderType === 'startup' ? 'text-indigo-200' : 'text-gray-400'}`}>
+                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center mt-10">
+              <MessageCircle size={48} className="mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-500">No messages yet</p>
+              <p className="text-xs text-gray-400 mt-1">Start the conversation!</p>
+            </div>
+          )}
+        </div>
+        <div className="flex p-4 border-t gap-2 bg-white rounded-b-xl">
+          <input
+            type="text"
+            className="flex-1 border rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()}
+            placeholder="Type a message..."
+          />
+          <button
+            className="px-4 py-2 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 transition"
+            onClick={sendChatMessage}
+          >
+            Send
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   // Main Render
   return (
@@ -833,6 +1009,24 @@ const StartupDashboard = () => {
             })}
           </ul>
         </nav>
+        
+        <div className="mt-8 pt-6 border-t">
+          <button
+            onClick={() => {
+              setChatOpen(true);
+              loadChats();
+            }}
+            className="w-full flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
+          >
+            <MessageCircle size={18} />
+            Messages
+            {chatList.filter(c => c.unreadCount > 0).length > 0 && (
+              <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-1">
+                {chatList.reduce((sum, c) => sum + c.unreadCount, 0)}
+              </span>
+            )}
+          </button>
+        </div>
       </aside>
 
       {/* Main Content */}
@@ -857,6 +1051,7 @@ const StartupDashboard = () => {
         {activePage === "commitments" && <SoftCommitmentsSection />}
         {activePage === "incubators" && <IncubatorsSection />}
         {activePage === "applications" && <ApplicationsSection />}
+        {chatOpen && <ChatBox />}
       </main>
     </div>
   );

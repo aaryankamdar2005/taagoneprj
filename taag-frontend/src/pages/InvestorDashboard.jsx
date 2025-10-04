@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Users, DollarSign, BarChart3, MessageCircle, Search, ArrowLeft } from "lucide-react";
+import { Users, DollarSign, BarChart3, MessageCircle, Search, ArrowLeft, CheckCircle, Clock, XCircle } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
-// Authenticated fetch helper
+// Authenticated fetch helper - WITH ERROR DETAILS
 const fetchWithAuth = async (url, opts = {}) => {
   const token = localStorage.getItem("token");
   const res = await fetch(url, {
@@ -10,11 +10,32 @@ const fetchWithAuth = async (url, opts = {}) => {
     headers: {
       ...opts.headers,
       Authorization: `Bearer ${token}`,
-      "Content-Type": opts.method && opts.method !== "GET" ? "application/json" : undefined
+      "Content-Type": "application/json"
     }
   });
+  
   const contentType = res.headers.get("content-type") || "";
-  if (contentType.includes("json")) return await res.json();
+  
+  if (!res.ok) {
+    let errorMessage = `HTTP ${res.status}: ${res.statusText}`;
+    
+    if (contentType.includes("json")) {
+      const errorData = await res.json();
+      console.error('API Error Response:', errorData);
+      errorMessage = errorData.message || errorData.error || errorMessage;
+    } else {
+      const errorText = await res.text();
+      console.error('API Error Text:', errorText);
+      errorMessage = errorText || errorMessage;
+    }
+    
+    throw new Error(errorMessage);
+  }
+  
+  if (contentType.includes("json")) {
+    return await res.json();
+  }
+  
   throw new Error(await res.text());
 };
 
@@ -22,7 +43,6 @@ const InvestorDashboard = () => {
   const [activePage, setActivePage] = useState("dashboard");
   const [searchQuery, setSearchQuery] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
-  const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState("");
   
   // Backend state
@@ -30,9 +50,15 @@ const InvestorDashboard = () => {
   const [profile, setProfile] = useState({});
   const [profileForm, setProfileForm] = useState({});
   const [startupDetails, setStartupDetails] = useState(null);
-  const [currentStartupId, setCurrentStartupId] = useState(null); // ✅ ADD THIS
+  const [currentStartupId, setCurrentStartupId] = useState(null);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // Chat state
+  const [chatList, setChatList] = useState([]);
+  const [activeChat, setActiveChat] = useState(null);
+  const [activeChatMessages, setActiveChatMessages] = useState([]);
 
   // Load initial data
   useEffect(() => {
@@ -41,14 +67,71 @@ const InvestorDashboard = () => {
 
   const loadData = async () => {
     try {
+      setLoading(true);
       const [dashRes, profileRes] = await Promise.all([
         fetchWithAuth("http://localhost:5000/api/investor/dashboard"),
         fetchWithAuth("http://localhost:5000/api/investor/profile")
       ]);
       setDashboard(dashRes.data || dashRes);
       setProfile(profileRes.data || profileRes);
+      setLoading(false);
     } catch (e) {
       setError(e.message || String(e));
+      setLoading(false);
+    }
+  };
+
+  // Chat functions
+  const loadChats = async () => {
+    try {
+      const res = await fetchWithAuth("http://localhost:5000/api/chat/chats");
+      setChatList((res.data || res).chats || []);
+    } catch (e) {
+      console.error('Error loading chats:', e);
+    }
+  };
+
+  const openChat = async (startupId) => {
+    try {
+      const res = await fetchWithAuth("http://localhost:5000/api/chat/chats", {
+        method: "POST",
+        body: JSON.stringify({ startupId })
+      });
+      
+      const chat = res.data || res;
+      setActiveChat(chat);
+      await loadChatMessages(chat._id);
+      setChatOpen(true);
+      await loadChats();
+    } catch (e) {
+      setError("Could not open chat: " + (e.message || String(e)));
+    }
+  };
+
+  const loadChatMessages = async (chatId) => {
+    try {
+      const res = await fetchWithAuth(`http://localhost:5000/api/chat/chats/${chatId}/messages`);
+      const data = res.data || res;
+      setActiveChatMessages(data.messages || []);
+    } catch (e) {
+      console.error('Error loading messages:', e);
+    }
+  };
+
+  const sendChatMessage = async () => {
+    if (!inputMessage.trim() || !activeChat) return;
+    
+    try {
+      await fetchWithAuth(`http://localhost:5000/api/chat/chats/${activeChat._id}/messages`, {
+        method: "POST",
+        body: JSON.stringify({ message: inputMessage })
+      });
+      
+      setInputMessage("");
+      await loadChatMessages(activeChat._id);
+      await loadChats();
+    } catch (e) {
+      setError("Could not send message: " + (e.message || String(e)));
     }
   };
 
@@ -83,19 +166,30 @@ const InvestorDashboard = () => {
   const Dashboard = () => {
     const chartData = getChartData();
 
+    if (loading) {
+      return <div className="text-center py-10">Loading dashboard...</div>;
+    }
+
     return (
       <div>
         <h2 className="text-2xl font-semibold mb-6">Investor Overview</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
           <div className="bg-white p-6 rounded-xl shadow flex items-center space-x-4">
             <DollarSign className="text-green-500 w-8 h-8" />
             <div>
               <p className="text-gray-500">Total Invested</p>
-              <h3 className="text-xl font-bold">₹{(dashboard.investorInfo?.capacity?.currentlyInvested || 0).toLocaleString()}</h3>
+              <h3 className="text-xl font-bold">₹{(dashboard.portfolio?.totalInvested || 0).toLocaleString()}</h3>
             </div>
           </div>
           <div className="bg-white p-6 rounded-xl shadow flex items-center space-x-4">
-            <Users className="text-indigo-500 w-8 h-8" />
+            <CheckCircle className="text-indigo-500 w-8 h-8" />
+            <div>
+              <p className="text-gray-500">Portfolio Companies</p>
+              <h3 className="text-xl font-bold">{dashboard.portfolio?.totalInvestments || 0}</h3>
+            </div>
+          </div>
+          <div className="bg-white p-6 rounded-xl shadow flex items-center space-x-4">
+            <Users className="text-blue-500 w-8 h-8" />
             <div>
               <p className="text-gray-500">Interested Startups</p>
               <h3 className="text-xl font-bold">{dashboard.matchedStartups?.length || 0}</h3>
@@ -104,11 +198,20 @@ const InvestorDashboard = () => {
           <div className="bg-white p-6 rounded-xl shadow flex items-center space-x-4">
             <BarChart3 className="text-pink-500 w-8 h-8" />
             <div>
-              <p className="text-gray-500">Active Deals</p>
+              <p className="text-gray-500">Pending Commitments</p>
               <h3 className="text-xl font-bold">{dashboard.activities?.activeSoftCommitments?.length || 0}</h3>
             </div>
           </div>
         </div>
+
+        {dashboard.investorInfo?.capacity?.totalCommitted > 0 && (
+          <div className="bg-blue-50 p-4 rounded-xl shadow mb-6">
+            <p className="text-sm text-gray-600">Total Pending Commitments</p>
+            <p className="text-2xl font-bold text-blue-600">
+              ₹{dashboard.investorInfo.capacity.totalCommitted.toLocaleString()}
+            </p>
+          </div>
+        )}
 
         <div className="bg-white p-6 rounded-xl shadow h-64">
           <h3 className="text-lg font-semibold mb-2">Investments Over Time</h3>
@@ -315,22 +418,20 @@ const InvestorDashboard = () => {
     </div>
   );
 
-  // View Startup Details - ✅ FIXED
+  // View Startup Details
   const viewStartup = async (startupId) => {
     try {
       setError("");
-      console.log("Viewing startup with ID:", startupId); // ✅ DEBUG LOG
-      setCurrentStartupId(startupId); // ✅ STORE THE ID
+      setCurrentStartupId(startupId);
       const res = await fetchWithAuth(`http://localhost:5000/api/investor/startups/${startupId}`);
       setStartupDetails(res.data || res);
       setActivePage("startup-view");
     } catch (err) {
-      console.error("Error loading startup:", err); // ✅ DEBUG LOG
       setError("Could not load startup details: " + (err.message || String(err)));
     }
   };
 
-  // Request Introduction - ✅ FIXED
+  // Request Introduction
   const requestIntro = async () => {
     if (!currentStartupId) {
       setError("Startup ID not found");
@@ -340,23 +441,24 @@ const InvestorDashboard = () => {
     const notes = prompt("Add a note (optional):");
     try {
       setError("");
-      console.log("Requesting intro for startup ID:", currentStartupId); // ✅ DEBUG LOG
+      setLoading(true);
       
-      const response = await fetchWithAuth(`http://localhost:5000/api/investor/startups/${currentStartupId}/intro-request`, {
+      await fetchWithAuth(`http://localhost:5000/api/investor/startups/${currentStartupId}/intro-request`, {
         method: "POST",
         body: JSON.stringify({ notes })
       });
       
-      console.log("Intro request response:", response); // ✅ DEBUG LOG
       setSuccessMsg("Introduction requested successfully!");
+      await loadData();
+      setLoading(false);
       setTimeout(() => setSuccessMsg(""), 3000);
     } catch (err) {
-      console.error("Intro request error:", err); // ✅ DEBUG LOG
       setError("Could not request introduction: " + (err.message || String(err)));
+      setLoading(false);
     }
   };
 
-  // Make Soft Commitment - ✅ FIXED
+  // Make Soft Commitment
   const makeInvestment = async () => {
     if (!currentStartupId) {
       setError("Startup ID not found");
@@ -364,32 +466,38 @@ const InvestorDashboard = () => {
     }
 
     const amount = prompt("Enter investment amount (₹):");
-    if (!amount) return;
+    if (!amount || isNaN(amount) || Number(amount) <= 0) {
+      setError("Please enter a valid amount");
+      return;
+    }
     
     const equity = prompt("Expected equity % (optional):");
     const conditions = prompt("Conditions (optional):");
     
     try {
       setError("");
-      console.log("Making soft commit for startup ID:", currentStartupId); // ✅ DEBUG LOG
+      setLoading(true);
       
-      const response = await fetchWithAuth(`http://localhost:5000/api/investor/startups/${currentStartupId}/soft-commit`, {
+      await fetchWithAuth(`http://localhost:5000/api/investor/startups/${currentStartupId}/soft-commit`, {
         method: "POST",
         body: JSON.stringify({
           amount: Number(amount),
-          equityExpected: equity ? Number(equity) : null,
-          conditions,
+          equityExpected: equity && equity.trim() !== '' ? Number(equity) : undefined,
+          conditions: conditions && conditions.trim() !== '' ? conditions : undefined,
           expiryDays: 30
         })
       });
       
-      console.log("Soft commit response:", response); // ✅ DEBUG LOG
       setSuccessMsg("Soft commitment made successfully!");
+      await loadData();
+      setActivePage("commitments");
+      setStartupDetails(null);
+      setCurrentStartupId(null);
+      setLoading(false);
       setTimeout(() => setSuccessMsg(""), 3000);
-      loadData();
     } catch (err) {
-      console.error("Soft commit error:", err); // ✅ DEBUG LOG
       setError("Could not make commitment: " + (err.message || String(err)));
+      setLoading(false);
     }
   };
 
@@ -415,19 +523,28 @@ const InvestorDashboard = () => {
           {filteredStartups.length > 0 ? (
             filteredStartups.map((startup) => (
               <li key={startup._id} className="bg-white p-4 rounded shadow flex justify-between items-center">
-                <span>{startup.companyName} – {startup.industry}</span>
+                <div className="flex items-center gap-3">
+                  {startup.logoUrl && (
+                    <img src={startup.logoUrl} alt="" className="w-10 h-10 rounded" />
+                  )}
+                  <div>
+                    <p className="font-semibold">{startup.companyName}</p>
+                    <p className="text-sm text-gray-600">{startup.industry} • {startup.stage}</p>
+                  </div>
+                </div>
                 <div className="flex gap-2">
                   <button 
-                    className="px-3 py-1 bg-yellow-400 rounded hover:bg-yellow-500 transition" 
-                    onClick={() => setChatOpen(true)}
+                    className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition flex items-center gap-1" 
+                    onClick={() => openChat(startup._id)}
                   >
+                    <MessageCircle size={16} />
                     Chat
                   </button>
                   <button 
-                    className="px-3 py-1 bg-green-400 rounded hover:bg-green-500 transition"
+                    className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 transition"
                     onClick={() => viewStartup(startup._id)}
                   >
-                    Invest
+                    View Details
                   </button>
                 </div>
               </li>
@@ -440,7 +557,7 @@ const InvestorDashboard = () => {
     );
   };
 
-  // Startup View Page - ✅ FIXED
+  // Startup View Page
   const StartupView = () => {
     if (!startupDetails) return <p>Loading...</p>;
 
@@ -452,7 +569,7 @@ const InvestorDashboard = () => {
           onClick={() => {
             setActivePage("fetch");
             setStartupDetails(null);
-            setCurrentStartupId(null); // ✅ CLEAR ID
+            setCurrentStartupId(null);
           }}
           className="flex items-center gap-2 text-indigo-600 hover:underline mb-4"
         >
@@ -461,8 +578,15 @@ const InvestorDashboard = () => {
         </button>
 
         <div className="bg-white p-6 rounded shadow">
-          <h2 className="text-2xl font-bold mb-2">{startup.overview?.companyName}</h2>
-          <p className="text-gray-700 mb-4">{startup.overview?.oneLineDescription}</p>
+          <div className="flex items-start gap-4 mb-4">
+            {startup.overview?.logoUrl && (
+              <img src={startup.overview.logoUrl} alt="" className="w-20 h-20 rounded" />
+            )}
+            <div>
+              <h2 className="text-2xl font-bold mb-2">{startup.overview?.companyName}</h2>
+              <p className="text-gray-700 mb-4">{startup.overview?.oneLineDescription}</p>
+            </div>
+          </div>
           
           <div className="flex gap-2 mb-4">
             <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded text-sm">
@@ -557,6 +681,13 @@ const InvestorDashboard = () => {
             >
               Make Investment
             </button>
+            <button
+              onClick={() => openChat(startup.overview._id)}
+              className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 flex items-center gap-2"
+            >
+              <MessageCircle size={16} />
+              Start Chat
+            </button>
           </div>
         </div>
       </div>
@@ -565,73 +696,457 @@ const InvestorDashboard = () => {
 
   // Investment Commitments Tab
   const InvestmentCommitments = () => {
-    const commitments = dashboard.activities?.activeSoftCommitments || [];
+    const softCommitments = dashboard.activities?.activeSoftCommitments || [];
+    const portfolioInvestments = dashboard.activities?.portfolioInvestments || [];
+    
+    const totalCommitted = softCommitments.reduce((sum, c) => sum + (c.amount || 0), 0);
+    const totalInvested = portfolioInvestments.reduce((sum, inv) => sum + (inv.investmentAmount || 0), 0);
+
+    const convertToInvestment = async (commitmentId, commitment) => {
+      const finalAmount = prompt(`Enter final investment amount (₹):`, commitment.amount);
+      if (!finalAmount) return;
+
+      const equityPercentage = prompt(`Enter equity percentage (%):`, commitment.equityExpected || '');
+      if (!equityPercentage) return;
+
+      const notes = prompt('Add any notes (optional):');
+
+      try {
+        setError("");
+        setLoading(true);
+
+        await fetchWithAuth(`http://localhost:5000/api/investor/commitments/${commitmentId}/convert`, {
+          method: "POST",
+          body: JSON.stringify({
+            finalAmount: Number(finalAmount),
+            equityPercentage: Number(equityPercentage),
+            notes
+          })
+        });
+
+        setSuccessMsg("Investment completed successfully! Added to portfolio.");
+        await loadData();
+        setLoading(false);
+        setTimeout(() => setSuccessMsg(""), 3000);
+      } catch (err) {
+        setError("Could not complete investment: " + (err.message || String(err)));
+        setLoading(false);
+      }
+    };
+
+    const withdrawCommitment = async (commitmentId) => {
+      const reason = prompt("Reason for withdrawing (optional):");
+      
+      if (!window.confirm("Are you sure you want to withdraw this commitment?")) {
+        return;
+      }
+
+      try {
+        setError("");
+        setLoading(true);
+
+        await fetchWithAuth(`http://localhost:5000/api/investor/commitments/${commitmentId}/withdraw`, {
+          method: "POST",
+          body: JSON.stringify({ reason })
+        });
+
+        setSuccessMsg("Commitment withdrawn successfully!");
+        await loadData();
+        setLoading(false);
+        setTimeout(() => setSuccessMsg(""), 3000);
+      } catch (err) {
+        setError("Could not withdraw commitment: " + (err.message || String(err)));
+        setLoading(false);
+      }
+    };
 
     return (
       <div>
-        <h2 className="text-2xl font-semibold mb-4">Investment Commitments</h2>
-        <ul className="space-y-3">
-          {commitments.length > 0 ? (
-            commitments.map((commitment, i) => (
-              <li key={i} className="bg-white p-4 rounded shadow flex justify-between items-center">
-                <span>
-                  {commitment.startupId?.companyName || "Startup"} - ₹{commitment.amount?.toLocaleString()}
-                  {commitment.equityExpected && ` (${commitment.equityExpected}% equity)`}
-                </span>
-                <div className="flex gap-2">
-                  <button className="px-3 py-1 bg-yellow-400 rounded hover:bg-yellow-500 transition">View</button>
-                  <button className="px-3 py-1 bg-red-400 text-white rounded hover:bg-red-500 transition">Remove</button>
+        <h2 className="text-2xl font-semibold mb-6">Investments & Commitments</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div className="bg-gradient-to-r from-green-50 to-green-100 p-6 rounded-xl shadow">
+            <p className="text-sm text-gray-600 mb-1">Total Invested (Portfolio)</p>
+            <p className="text-3xl font-bold text-green-600">₹{totalInvested.toLocaleString()}</p>
+            <p className="text-sm text-gray-500 mt-1">
+              {portfolioInvestments.length} {portfolioInvestments.length === 1 ? 'company' : 'companies'}
+            </p>
+          </div>
+          <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-xl shadow">
+            <p className="text-sm text-gray-600 mb-1">Pending Commitments</p>
+            <p className="text-3xl font-bold text-blue-600">₹{totalCommitted.toLocaleString()}</p>
+            <p className="text-sm text-gray-500 mt-1">
+              {softCommitments.length} active {softCommitments.length === 1 ? 'commitment' : 'commitments'}
+            </p>
+          </div>
+        </div>
+
+        <div className="mb-8">
+          <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <CheckCircle className="text-green-500" size={24} />
+            Portfolio Investments
+          </h3>
+          {portfolioInvestments.length > 0 ? (
+            <div className="space-y-4">
+              {portfolioInvestments.map((investment, i) => (
+                <div key={i} className="bg-white p-6 rounded-lg shadow hover:shadow-md transition">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex items-center gap-3">
+                      {investment.startupId?.logoUrl && (
+                        <img 
+                          src={investment.startupId.logoUrl} 
+                          alt="" 
+                          className="w-12 h-12 rounded object-cover"
+                        />
+                      )}
+                      <div>
+                        <p className="font-semibold text-lg">
+                          {investment.startupId?.companyName || "Startup"}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {investment.startupId?.industry} • {investment.startupId?.stage}
+                        </p>
+                        {investment.startupId?.website && (
+                          <a 
+                            href={investment.startupId.website} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:underline"
+                          >
+                            Visit Website
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    <span className={`px-3 py-1 rounded text-sm font-semibold ${
+                      investment.status === 'active' ? 'bg-green-100 text-green-700' :
+                      investment.status === 'exited' ? 'bg-blue-100 text-blue-700' :
+                      'bg-red-100 text-red-700'
+                    }`}>
+                      {investment.status}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                    <div className="bg-green-50 p-3 rounded">
+                      <p className="text-xs text-gray-600 mb-1">Investment Amount</p>
+                      <p className="text-lg font-bold text-green-700">
+                        ₹{(investment.investmentAmount || 0).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="bg-blue-50 p-3 rounded">
+                      <p className="text-xs text-gray-600 mb-1">Equity Owned</p>
+                      <p className="text-lg font-bold text-blue-700">
+                        {investment.equityPercentage || 0}%
+                      </p>
+                    </div>
+                    <div className="bg-purple-50 p-3 rounded">
+                      <p className="text-xs text-gray-600 mb-1">Investment Date</p>
+                      <p className="text-sm font-semibold text-purple-700">
+                        {new Date(investment.investmentDate).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="bg-orange-50 p-3 rounded">
+                      <p className="text-xs text-gray-600 mb-1">Current Valuation</p>
+                      <p className="text-sm font-semibold text-orange-700">
+                        {investment.currentValuation 
+                          ? `₹${investment.currentValuation.toLocaleString()}`
+                          : 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {investment.currentValuation && investment.investmentAmount && (
+                    <div className="mt-3 p-3 bg-indigo-50 rounded">
+                      <p className="text-sm font-semibold text-indigo-600">
+                        ROI: {((investment.currentValuation - investment.investmentAmount) / investment.investmentAmount * 100).toFixed(2)}%
+                      </p>
+                    </div>
+                  )}
                 </div>
-              </li>
-            ))
+              ))}
+            </div>
           ) : (
-            <p className="text-gray-500">No investment commitments yet</p>
+            <div className="bg-gray-50 p-8 rounded-lg text-center">
+              <p className="text-gray-500">No portfolio investments yet</p>
+              <p className="text-sm text-gray-400 mt-2">
+                Convert your soft commitments to add companies to your portfolio
+              </p>
+            </div>
           )}
-        </ul>
+        </div>
+
+        <div>
+          <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <Clock className="text-blue-500" size={24} />
+            Pending Soft Commitments
+          </h3>
+          {softCommitments.length > 0 ? (
+            <div className="space-y-4">
+              {softCommitments.map((commitment, i) => (
+                <div key={i} className="bg-white p-6 rounded-lg shadow hover:shadow-md transition border-l-4 border-blue-500">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex items-center gap-3">
+                      {commitment.startupId?.logoUrl && (
+                        <img 
+                          src={commitment.startupId.logoUrl} 
+                          alt="" 
+                          className="w-12 h-12 rounded object-cover"
+                        />
+                      )}
+                      <div>
+                        <p className="font-semibold text-lg">
+                          {commitment.startupId?.companyName || "Startup"}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {commitment.startupId?.industry} • {commitment.startupId?.stage}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`px-3 py-1 rounded text-sm font-semibold ${
+                      commitment.status === 'active' ? 'bg-yellow-100 text-yellow-700' :
+                      commitment.status === 'converted' ? 'bg-green-100 text-green-700' :
+                      commitment.status === 'expired' ? 'bg-red-100 text-red-700' :
+                      'bg-gray-100 text-gray-700'
+                    }`}>
+                      {commitment.status}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+                    <div className="bg-blue-50 p-3 rounded">
+                      <p className="text-xs text-gray-600 mb-1">Committed Amount</p>
+                      <p className="text-lg font-bold text-blue-700">
+                        ₹{(commitment.amount || 0).toLocaleString()}
+                      </p>
+                    </div>
+                    {commitment.equityExpected && (
+                      <div className="bg-purple-50 p-3 rounded">
+                        <p className="text-xs text-gray-600 mb-1">Expected Equity</p>
+                        <p className="text-lg font-bold text-purple-700">
+                          {commitment.equityExpected}%
+                        </p>
+                      </div>
+                    )}
+                    <div className={`p-3 rounded ${
+                      commitment.daysRemaining > 7 ? 'bg-green-50' :
+                      commitment.daysRemaining > 0 ? 'bg-orange-50' : 'bg-red-50'
+                    }`}>
+                      <p className="text-xs text-gray-600 mb-1">Time Remaining</p>
+                      <p className={`text-sm font-semibold ${
+                        commitment.daysRemaining > 7 ? 'text-green-700' :
+                        commitment.daysRemaining > 0 ? 'text-orange-700' : 'text-red-700'
+                      }`}>
+                        {commitment.daysRemaining > 0 
+                          ? `${commitment.daysRemaining} days`
+                          : commitment.daysRemaining === 0
+                          ? 'Expires today'
+                          : 'Expired'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {commitment.conditions && (
+                    <div className="mt-3 p-3 bg-gray-50 rounded">
+                      <p className="text-sm text-gray-700">
+                        <span className="font-semibold">Conditions:</span> {commitment.conditions}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 text-sm text-gray-600 mt-3">
+                    <span>Committed: {new Date(commitment.commitDate).toLocaleDateString()}</span>
+                    {commitment.expiryDate && (
+                      <span>• Expires: {new Date(commitment.expiryDate).toLocaleDateString()}</span>
+                    )}
+                  </div>
+
+                  {commitment.status === 'active' && (
+                    <div className="flex gap-2 mt-4">
+                      <button 
+                        onClick={() => convertToInvestment(commitment._id, commitment)}
+                        className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition text-sm font-semibold flex items-center gap-2"
+                      >
+                        <CheckCircle size={16} />
+                        Complete Investment
+                      </button>
+                      <button 
+                        onClick={() => withdrawCommitment(commitment._id)}
+                        className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition text-sm flex items-center gap-2"
+                      >
+                        <XCircle size={16} />
+                        Withdraw
+                      </button>
+                    </div>
+                  )}
+
+                  {commitment.status === 'converted' && (
+                    <div className="mt-3 p-3 bg-green-50 rounded border border-green-200">
+                      <p className="text-sm text-green-700 font-semibold">
+                        ✓ Investment completed and added to portfolio
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-gray-50 p-8 rounded-lg text-center">
+              <p className="text-gray-500">No pending commitments</p>
+              <p className="text-sm text-gray-400 mt-2">
+                Your soft commitments will appear here
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     );
   };
 
-  // Chat component
-  const ChatBox = () => (
-    <div className="fixed bottom-4 right-4 w-80 bg-white shadow-lg rounded-xl flex flex-col h-96">
-      <div className="flex items-center justify-between p-4 border-b">
-        <h3 className="font-semibold text-lg">Chat</h3>
-        <button className="text-red-500 font-bold" onClick={() => setChatOpen(false)}>X</button>
-      </div>
-      <div className="flex-1 p-4 overflow-y-auto space-y-2">
-        {messages.map((msg, i) => (
-          <div key={i} className={`p-2 rounded ${i % 2 === 0 ? "bg-gray-200 self-start" : "bg-indigo-100 self-end"}`}>
-            {msg}
+  // Chat component with auto-refresh
+  const ChatBox = () => {
+    useEffect(() => {
+      if (chatOpen && !activeChat) {
+        loadChats();
+      }
+    }, [chatOpen]);
+
+    useEffect(() => {
+      let interval;
+      if (chatOpen && activeChat) {
+        interval = setInterval(() => {
+          loadChatMessages(activeChat._id);
+        }, 5000);
+      }
+      return () => clearInterval(interval);
+    }, [chatOpen, activeChat]);
+
+    if (!activeChat) {
+      return (
+        <div className="fixed bottom-4 right-4 w-80 bg-white shadow-2xl rounded-xl flex flex-col h-96 z-50 border border-gray-200">
+          <div className="flex items-center justify-between p-4 border-b bg-indigo-600 text-white rounded-t-xl">
+            <h3 className="font-semibold text-lg flex items-center gap-2">
+              <MessageCircle size={20} />
+              Messages
+            </h3>
+            <button className="text-white font-bold hover:bg-indigo-700 rounded px-2" onClick={() => setChatOpen(false)}>✕</button>
           </div>
-        ))}
+          <div className="flex-1 overflow-y-auto p-3">
+            {chatList.length > 0 ? (
+              <div className="space-y-2">
+                {chatList.map((chat) => (
+                  <div
+                    key={chat._id}
+                    onClick={() => {
+                      setActiveChat(chat);
+                      loadChatMessages(chat._id);
+                    }}
+                    className="p-3 hover:bg-gray-100 rounded cursor-pointer transition"
+                  >
+                    <div className="flex items-center gap-3">
+                      {chat.participant.logoUrl && (
+                        <img src={chat.participant.logoUrl} alt="" className="w-10 h-10 rounded-full object-cover" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate">{chat.participant.name}</p>
+                        <p className="text-xs text-gray-500 truncate">{chat.lastMessage || 'No messages yet'}</p>
+                      </div>
+                      {chat.unreadCount > 0 && (
+                        <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 font-semibold">
+                          {chat.unreadCount}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center mt-10">
+                <MessageCircle size={48} className="mx-auto text-gray-300 mb-3" />
+                <p className="text-gray-500">No conversations yet</p>
+                <p className="text-xs text-gray-400 mt-1">Start chatting with startups!</p>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="fixed bottom-4 right-4 w-96 bg-white shadow-2xl rounded-xl flex flex-col h-[500px] z-50 border border-gray-200">
+        <div className="flex items-center justify-between p-4 border-b bg-indigo-600 text-white rounded-t-xl">
+          <button 
+            onClick={() => {
+              setActiveChat(null);
+              setActiveChatMessages([]);
+            }}
+            className="text-white hover:bg-indigo-700 rounded px-2"
+          >
+            ← Back
+          </button>
+          <h3 className="font-semibold text-lg flex items-center gap-2">
+            {activeChat.participant?.logoUrl && (
+              <img src={activeChat.participant.logoUrl} alt="" className="w-6 h-6 rounded-full" />
+            )}
+            {activeChat.participant?.name}
+          </h3>
+          <button className="text-white font-bold hover:bg-indigo-700 rounded px-2" onClick={() => {
+            setChatOpen(false);
+            setActiveChat(null);
+            setActiveChatMessages([]);
+          }}>✕</button>
+        </div>
+        <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-gray-50">
+          {activeChatMessages.length > 0 ? (
+            activeChatMessages.map((msg, i) => (
+              <div
+                key={i}
+                className={`flex ${msg.senderType === 'investor' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[70%] p-3 rounded-lg ${
+                    msg.senderType === 'investor'
+                      ? 'bg-indigo-600 text-white rounded-br-none'
+                      : 'bg-white text-gray-800 rounded-bl-none shadow'
+                  }`}
+                >
+                  <p className="text-sm break-words">{msg.message}</p>
+                  <p className={`text-xs mt-1 ${msg.senderType === 'investor' ? 'text-indigo-200' : 'text-gray-400'}`}>
+                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center mt-10">
+              <MessageCircle size={48} className="mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-500">No messages yet</p>
+              <p className="text-xs text-gray-400 mt-1">Start the conversation!</p>
+            </div>
+          )}
+        </div>
+        <div className="flex p-4 border-t gap-2 bg-white rounded-b-xl">
+          <input
+            type="text"
+            className="flex-1 border rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()}
+            placeholder="Type a message..."
+          />
+          <button
+            className="px-4 py-2 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 transition"
+            onClick={sendChatMessage}
+          >
+            Send
+          </button>
+        </div>
       </div>
-      <div className="flex p-4 border-t gap-2">
-        <input
-          type="text"
-          className="flex-1 border rounded px-2 py-1"
-          value={inputMessage}
-          onChange={(e) => setInputMessage(e.target.value)}
-          placeholder="Type a message..."
-        />
-        <button
-          className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
-          onClick={() => {
-            if (inputMessage.trim() !== "") {
-              setMessages([...messages, inputMessage]);
-              setInputMessage("");
-            }
-          }}
-        >
-          Send
-        </button>
-      </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="flex h-screen bg-gray-100">
-      {/* Sidebar */}
       <aside className="w-64 bg-white shadow-lg p-6 hidden md:block">
         <h1 className="text-2xl font-bold text-indigo-600 mb-8">Investor</h1>
         <ul className="space-y-4">
@@ -660,11 +1175,35 @@ const InvestorDashboard = () => {
             Investment Commitments
           </li>
         </ul>
+        
+        <div className="mt-8 pt-6 border-t">
+          <button
+            onClick={() => {
+              setChatOpen(true);
+              loadChats();
+            }}
+            className="w-full flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
+          >
+            <MessageCircle size={18} />
+            Messages
+            {chatList.filter(c => c.unreadCount > 0).length > 0 && (
+              <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-1">
+                {chatList.reduce((sum, c) => sum + c.unreadCount, 0)}
+              </span>
+            )}
+          </button>
+        </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 p-6 overflow-y-auto relative">
-        {/* Error/Success Messages */}
+        {loading && (
+          <div className="fixed inset-0 bg-black bg-opacity-20 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg shadow-lg">
+              <p className="text-lg font-semibold">Updating...</p>
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
             {error}

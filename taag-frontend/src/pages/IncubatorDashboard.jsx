@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Users, BarChart3, Settings, Star, CheckCircle, XCircle, Eye } from "lucide-react";
+import { Users, BarChart3, Settings, Star, CheckCircle, XCircle, Eye, MessageCircle } from "lucide-react";
 
-// Authenticated fetch helper
+// Authenticated fetch helper - WITH ERROR DETAILS
 const fetchWithAuth = async (url, opts = {}) => {
   const token = localStorage.getItem("token");
   const res = await fetch(url, {
@@ -9,11 +9,32 @@ const fetchWithAuth = async (url, opts = {}) => {
     headers: {
       ...opts.headers,
       Authorization: `Bearer ${token}`,
-      "Content-Type": opts.method && opts.method !== "GET" ? "application/json" : undefined
+      "Content-Type": "application/json"
     }
   });
+  
   const contentType = res.headers.get("content-type") || "";
-  if (contentType.includes("json")) return await res.json();
+  
+  if (!res.ok) {
+    let errorMessage = `HTTP ${res.status}: ${res.statusText}`;
+    
+    if (contentType.includes("json")) {
+      const errorData = await res.json();
+      console.error('API Error Response:', errorData);
+      errorMessage = errorData.message || errorData.error || errorMessage;
+    } else {
+      const errorText = await res.text();
+      console.error('API Error Text:', errorText);
+      errorMessage = errorText || errorMessage;
+    }
+    
+    throw new Error(errorMessage);
+  }
+  
+  if (contentType.includes("json")) {
+    return await res.json();
+  }
+  
   throw new Error(await res.text());
 };
 
@@ -29,6 +50,13 @@ const IncubatorDashboard = () => {
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Chat state
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatList, setChatList] = useState([]);
+  const [activeChat, setActiveChat] = useState(null);
+  const [activeChatMessages, setActiveChatMessages] = useState([]);
+  const [inputMessage, setInputMessage] = useState("");
 
   // Load initial data
   useEffect(() => {
@@ -58,6 +86,60 @@ const IncubatorDashboard = () => {
     }
   };
 
+  // Chat functions
+  const loadChats = async () => {
+    try {
+      const res = await fetchWithAuth("http://localhost:5000/api/chat/chats");
+      setChatList((res.data || res).chats || []);
+    } catch (e) {
+      console.error('Error loading chats:', e);
+    }
+  };
+
+  const openChat = async (startupId) => {
+    try {
+      const res = await fetchWithAuth("http://localhost:5000/api/chat/chats", {
+        method: "POST",
+        body: JSON.stringify({ startupId })
+      });
+      
+      const chat = res.data || res;
+      setActiveChat(chat);
+      await loadChatMessages(chat._id);
+      setChatOpen(true);
+      await loadChats();
+    } catch (e) {
+      setError("Could not open chat: " + (e.message || String(e)));
+    }
+  };
+
+  const loadChatMessages = async (chatId) => {
+    try {
+      const res = await fetchWithAuth(`http://localhost:5000/api/chat/chats/${chatId}/messages`);
+      const data = res.data || res;
+      setActiveChatMessages(data.messages || []);
+    } catch (e) {
+      console.error('Error loading messages:', e);
+    }
+  };
+
+  const sendChatMessage = async () => {
+    if (!inputMessage.trim() || !activeChat) return;
+    
+    try {
+      await fetchWithAuth(`http://localhost:5000/api/chat/chats/${activeChat._id}/messages`, {
+        method: "POST",
+        body: JSON.stringify({ message: inputMessage })
+      });
+      
+      setInputMessage("");
+      await loadChatMessages(activeChat._id);
+      await loadChats();
+    } catch (e) {
+      setError("Could not send message: " + (e.message || String(e)));
+    }
+  };
+
   // Dashboard Home
   const DashboardHome = () => {
     if (loading) {
@@ -84,13 +166,7 @@ const IncubatorDashboard = () => {
               <h3 className="text-xl font-bold">{stats.activeStartups || 0}</h3>
             </div>
           </div>
-          <div className="bg-white p-6 rounded-xl shadow flex items-center space-x-4">
-            <Star className="text-yellow-500 w-8 h-8" />
-            <div>
-              <p className="text-gray-500">Active Mentors</p>
-              <h3 className="text-xl font-bold">{stats.activeMentors || 0}</h3>
-            </div>
-          </div>
+       
           <div className="bg-white p-6 rounded-xl shadow flex items-center space-x-4">
             <Settings className="text-green-500 w-8 h-8" />
             <div>
@@ -107,18 +183,29 @@ const IncubatorDashboard = () => {
             <ul className="space-y-3">
               {applications.slice(0, 5).map((app) => (
                 <li key={app._id} className="flex justify-between items-center border-b pb-2">
-                  <div>
+                  <div className="flex-1">
                     <p className="font-semibold">{app.startup?.companyName}</p>
                     <p className="text-sm text-gray-600">{app.startup?.industry} • {app.startup?.stage}</p>
                   </div>
-                  <span className={`px-3 py-1 rounded text-sm ${
-                    app.status === 'applied' ? 'bg-yellow-100 text-yellow-700' :
-                    app.status === 'viewed' ? 'bg-blue-100 text-blue-700' :
-                    app.status === 'closed-deal' ? 'bg-green-100 text-green-700' :
-                    'bg-red-100 text-red-700'
-                  }`}>
-                    {app.status}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-3 py-1 rounded text-sm ${
+                      app.status === 'applied' ? 'bg-yellow-100 text-yellow-700' :
+                      app.status === 'viewed' ? 'bg-blue-100 text-blue-700' :
+                      app.status === 'closed-deal' ? 'bg-green-100 text-green-700' :
+                      'bg-red-100 text-red-700'
+                    }`}>
+                      {app.status}
+                    </span>
+                    {(app.status === 'closed-deal' || app.status === 'viewed') && (
+                      <button
+                        onClick={() => openChat(app.startup._id)}
+                        className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-sm flex items-center gap-1"
+                      >
+                        <MessageCircle size={14} />
+                        Chat
+                      </button>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>
@@ -335,7 +422,6 @@ const IncubatorDashboard = () => {
       
       setSuccessMsg(`Mentor ${action}d successfully!`);
       
-      // Reload mentors
       const mentorsRes = await fetchWithAuth("http://localhost:5000/api/incubator/mentors/pending");
       setMentors((mentorsRes.data || mentorsRes).mentors || []);
       
@@ -412,7 +498,6 @@ const IncubatorDashboard = () => {
       
       setSuccessMsg(`Application ${action}ed successfully!`);
       
-      // Reload applications
       const appsRes = await fetchWithAuth("http://localhost:5000/api/incubator/applications");
       setApplications((appsRes.data || appsRes).applications || []);
       
@@ -470,12 +555,22 @@ const IncubatorDashboard = () => {
                   </td>
                   <td className="p-3">{app.daysSinceApplication} days</td>
                   <td className="p-3">
-                    <button 
-                      onClick={() => viewApplication(app)}
-                      className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-sm"
-                    >
-                      View Details
-                    </button>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => viewApplication(app)}
+                        className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-sm"
+                      >
+                        View
+                      </button>
+                      {(app.status === 'closed-deal' || app.status === 'viewed') && (
+                        <button 
+                          onClick={() => openChat(app.startup._id)}
+                          className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 transition text-sm flex items-center gap-1"
+                        >
+                          <MessageCircle size={14} />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -628,12 +723,28 @@ const IncubatorDashboard = () => {
                 <XCircle size={16} />
                 Reject
               </button>
+              <button
+                onClick={() => openChat(startup._id)}
+                className="px-6 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 flex items-center gap-2"
+              >
+                <MessageCircle size={16} />
+                Chat
+              </button>
             </div>
           ) : (
             <div className="p-4 bg-gray-100 rounded">
               <p className="text-gray-700">Status: <span className="font-semibold capitalize">{app.status}</span></p>
               {app.reviewInfo?.reviewNotes && (
                 <p className="text-sm text-gray-600 mt-2">Notes: {app.reviewInfo.reviewNotes}</p>
+              )}
+              {(app.status === 'closed-deal' || app.status === 'viewed') && (
+                <button
+                  onClick={() => openChat(startup._id)}
+                  className="mt-3 px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center gap-2"
+                >
+                  <MessageCircle size={16} />
+                  Chat with Startup
+                </button>
               )}
             </div>
           )}
@@ -643,154 +754,245 @@ const IncubatorDashboard = () => {
   };
 
   // Funnel Analytics
-// Funnel Analytics - ✅ FIXED WITH PROPER CALCULATIONS
-const FunnelPage = () => {
-  const funnelData = funnel.funnel || {};
-  let conversions = funnel.conversionRates || {};
+  const FunnelPage = () => {
+    const funnelData = funnel.funnel || {};
+    let conversions = funnel.conversionRates || {};
 
-  // ✅ FALLBACK: Calculate conversion rates if not provided by backend
-  if (!conversions.applicationToView && !conversions.viewToAccept && !conversions.overallSuccess) {
-    const total = (funnelData.applied || 0) + (funnelData.viewed || 0) + 
-                  (funnelData.closedDeals || 0) + (funnelData.rejected || 0);
-    
-    const reviewed = (funnelData.viewed || 0) + (funnelData.closedDeals || 0) + (funnelData.rejected || 0);
-    const viewedPlusAccepted = (funnelData.viewed || 0) + (funnelData.closedDeals || 0);
-    
-    conversions = {
-      applicationToView: total > 0 ? Math.round((reviewed / total) * 100) : 0,
-      viewToAccept: viewedPlusAccepted > 0 ? Math.round(((funnelData.closedDeals || 0) / viewedPlusAccepted) * 100) : 0,
-      overallSuccess: total > 0 ? Math.round(((funnelData.closedDeals || 0) / total) * 100) : 0
-    };
-  }
-
-  const insights = funnel.insights || {};
-
-  return (
-    <div>
-      <h2 className="text-2xl font-semibold mb-4">Funnel Analytics</h2>
+    if (!conversions.applicationToView && !conversions.viewToAccept && !conversions.overallSuccess) {
+      const total = (funnelData.applied || 0) + (funnelData.viewed || 0) + 
+                    (funnelData.closedDeals || 0) + (funnelData.rejected || 0);
       
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white p-6 rounded shadow">
-          <p className="text-gray-600 text-sm">Applied</p>
-          <p className="text-3xl font-bold text-yellow-600">{funnelData.applied || 0}</p>
-          <p className="text-xs text-gray-500 mt-1">Pending Review</p>
+      const reviewed = (funnelData.viewed || 0) + (funnelData.closedDeals || 0) + (funnelData.rejected || 0);
+      const viewedPlusAccepted = (funnelData.viewed || 0) + (funnelData.closedDeals || 0);
+      
+      conversions = {
+        applicationToView: total > 0 ? Math.round((reviewed / total) * 100) : 0,
+        viewToAccept: viewedPlusAccepted > 0 ? Math.round(((funnelData.closedDeals || 0) / viewedPlusAccepted) * 100) : 0,
+        overallSuccess: total > 0 ? Math.round(((funnelData.closedDeals || 0) / total) * 100) : 0
+      };
+    }
+
+    const insights = funnel.insights || {};
+
+    return (
+      <div>
+        <h2 className="text-2xl font-semibold mb-4">Funnel Analytics</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white p-6 rounded shadow">
+            <p className="text-gray-600 text-sm">Applied</p>
+            <p className="text-3xl font-bold text-yellow-600">{funnelData.applied || 0}</p>
+            <p className="text-xs text-gray-500 mt-1">Pending Review</p>
+          </div>
+          <div className="bg-white p-6 rounded shadow">
+            <p className="text-gray-600 text-sm">Viewed</p>
+            <p className="text-3xl font-bold text-blue-600">{funnelData.viewed || 0}</p>
+            <p className="text-xs text-gray-500 mt-1">Under Consideration</p>
+          </div>
+          <div className="bg-white p-6 rounded shadow">
+            <p className="text-gray-600 text-sm">Accepted</p>
+            <p className="text-3xl font-bold text-green-600">{funnelData.closedDeals || 0}</p>
+            <p className="text-xs text-gray-500 mt-1">Successful</p>
+          </div>
+          <div className="bg-white p-6 rounded shadow">
+            <p className="text-gray-600 text-sm">Rejected</p>
+            <p className="text-3xl font-bold text-red-600">{funnelData.rejected || 0}</p>
+            <p className="text-xs text-gray-500 mt-1">Not Selected</p>
+          </div>
         </div>
-        <div className="bg-white p-6 rounded shadow">
-          <p className="text-gray-600 text-sm">Viewed</p>
-          <p className="text-3xl font-bold text-blue-600">{funnelData.viewed || 0}</p>
-          <p className="text-xs text-gray-500 mt-1">Under Consideration</p>
+
+        <div className="bg-white p-6 rounded shadow mb-6">
+          <h3 className="font-semibold mb-4">Conversion Rates</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="text-center p-4 bg-blue-50 rounded">
+              <p className="text-sm text-gray-600 mb-2">Application → Reviewed</p>
+              <p className="text-4xl font-bold text-blue-600">{conversions.applicationToView}%</p>
+              <p className="text-xs text-gray-500 mt-2">Applications that were reviewed</p>
+            </div>
+            <div className="text-center p-4 bg-green-50 rounded">
+              <p className="text-sm text-gray-600 mb-2">Reviewed → Accepted</p>
+              <p className="text-4xl font-bold text-green-600">{conversions.viewToAccept}%</p>
+              <p className="text-xs text-gray-500 mt-2">Reviewed applications that were accepted</p>
+            </div>
+            <div className="text-center p-4 bg-indigo-50 rounded">
+              <p className="text-sm text-gray-600 mb-2">Overall Success Rate</p>
+              <p className="text-4xl font-bold text-indigo-600">{conversions.overallSuccess}%</p>
+              <p className="text-xs text-gray-500 mt-2">Total applications accepted</p>
+            </div>
+          </div>
         </div>
+
         <div className="bg-white p-6 rounded shadow">
-          <p className="text-gray-600 text-sm">Accepted</p>
-          <p className="text-3xl font-bold text-green-600">{funnelData.closedDeals || 0}</p>
-          <p className="text-xs text-gray-500 mt-1">Successful</p>
-        </div>
-        <div className="bg-white p-6 rounded shadow">
-          <p className="text-gray-600 text-sm">Rejected</p>
-          <p className="text-3xl font-bold text-red-600">{funnelData.rejected || 0}</p>
-          <p className="text-xs text-gray-500 mt-1">Not Selected</p>
+          <h3 className="font-semibold mb-6">Application Journey</h3>
+          <div className="flex items-end justify-around h-72 bg-gray-50 rounded p-4">
+            {[
+              { key: 'applied', label: 'Applied', color: 'bg-yellow-500', value: funnelData.applied || 0 },
+              { key: 'viewed', label: 'Viewed', color: 'bg-blue-500', value: funnelData.viewed || 0 },
+              { key: 'closedDeals', label: 'Accepted', color: 'bg-green-500', value: funnelData.closedDeals || 0 },
+              { key: 'rejected', label: 'Rejected', color: 'bg-red-500', value: funnelData.rejected || 0 }
+            ].map((item) => {
+              const maxValue = Math.max(
+                funnelData.applied || 0,
+                funnelData.viewed || 0,
+                funnelData.closedDeals || 0,
+                funnelData.rejected || 0,
+                1
+              );
+              const heightPercent = (item.value / maxValue) * 100;
+
+              return (
+                <div key={item.key} className="flex flex-col items-center">
+                  <div 
+                    className={`w-20 ${item.color} rounded-t transition-all duration-500`}
+                    style={{ height: `${heightPercent}%`, minHeight: item.value > 0 ? '20px' : '0' }}
+                  />
+                  <p className="mt-3 text-2xl font-bold text-gray-800">{item.value}</p>
+                  <p className="text-sm text-gray-600 font-medium">{item.label}</p>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
+    );
+  };
 
-      {/* Conversion Rates */}
-      <div className="bg-white p-6 rounded shadow mb-6">
-        <h3 className="font-semibold mb-4">Conversion Rates</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="text-center p-4 bg-blue-50 rounded">
-            <p className="text-sm text-gray-600 mb-2">Application → Reviewed</p>
-            <p className="text-4xl font-bold text-blue-600">{conversions.applicationToView}%</p>
-            <p className="text-xs text-gray-500 mt-2">
-              Applications that were reviewed
-            </p>
-          </div>
-          <div className="text-center p-4 bg-green-50 rounded">
-            <p className="text-sm text-gray-600 mb-2">Reviewed → Accepted</p>
-            <p className="text-4xl font-bold text-green-600">{conversions.viewToAccept}%</p>
-            <p className="text-xs text-gray-500 mt-2">
-              Reviewed applications that were accepted
-            </p>
-          </div>
-          <div className="text-center p-4 bg-indigo-50 rounded">
-            <p className="text-sm text-gray-600 mb-2">Overall Success Rate</p>
-            <p className="text-4xl font-bold text-indigo-600">{conversions.overallSuccess}%</p>
-            <p className="text-xs text-gray-500 mt-2">
-              Total applications accepted
-            </p>
-          </div>
-        </div>
-      </div>
+  // Chat Component
+  const ChatBox = () => {
+    useEffect(() => {
+      if (chatOpen && !activeChat) {
+        loadChats();
+      }
+    }, [chatOpen]);
 
-      {/* Insights Summary */}
-      {insights.totalApplications > 0 && (
-        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-6 rounded shadow mb-6">
-          <h3 className="font-semibold mb-3">Key Insights</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-            <div>
-              <p className="text-2xl font-bold text-indigo-600">{insights.totalApplications || funnelData.total || 0}</p>
-              <p className="text-sm text-gray-600">Total Applications</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-yellow-600">{insights.pendingReview || funnelData.applied || 0}</p>
-              <p className="text-sm text-gray-600">Awaiting Review</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-green-600">{insights.successful || funnelData.closedDeals || 0}</p>
-              <p className="text-sm text-gray-600">Successful</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-red-600">{insights.unsuccessful || funnelData.rejected || 0}</p>
-              <p className="text-sm text-gray-600">Rejected</p>
-            </div>
+    useEffect(() => {
+      let interval;
+      if (chatOpen && activeChat) {
+        interval = setInterval(() => {
+          loadChatMessages(activeChat._id);
+        }, 5000);
+      }
+      return () => clearInterval(interval);
+    }, [chatOpen, activeChat]);
+
+    if (!activeChat) {
+      return (
+        <div className="fixed bottom-4 right-4 w-80 bg-white shadow-2xl rounded-xl flex flex-col h-96 z-50 border border-gray-200">
+          <div className="flex items-center justify-between p-4 border-b bg-indigo-600 text-white rounded-t-xl">
+            <h3 className="font-semibold text-lg flex items-center gap-2">
+              <MessageCircle size={20} />
+              Messages
+            </h3>
+            <button className="text-white font-bold hover:bg-indigo-700 rounded px-2" onClick={() => setChatOpen(false)}>✕</button>
           </div>
-        </div>
-      )}
-
-      {/* Visual Funnel */}
-      <div className="bg-white p-6 rounded shadow">
-        <h3 className="font-semibold mb-6">Application Journey</h3>
-        <div className="flex items-end justify-around h-72 bg-gray-50 rounded p-4">
-          {[
-            { key: 'applied', label: 'Applied', color: 'bg-yellow-500', value: funnelData.applied || 0 },
-            { key: 'viewed', label: 'Viewed', color: 'bg-blue-500', value: funnelData.viewed || 0 },
-            { key: 'closedDeals', label: 'Accepted', color: 'bg-green-500', value: funnelData.closedDeals || 0 },
-            { key: 'rejected', label: 'Rejected', color: 'bg-red-500', value: funnelData.rejected || 0 }
-          ].map((item) => {
-            const maxValue = Math.max(
-              funnelData.applied || 0,
-              funnelData.viewed || 0,
-              funnelData.closedDeals || 0,
-              funnelData.rejected || 0,
-              1 // Prevent division by zero
-            );
-            const heightPercent = (item.value / maxValue) * 100;
-
-            return (
-              <div key={item.key} className="flex flex-col items-center">
-                <div 
-                  className={`w-20 ${item.color} rounded-t transition-all duration-500`}
-                  style={{ height: `${heightPercent}%`, minHeight: item.value > 0 ? '20px' : '0' }}
-                />
-                <p className="mt-3 text-2xl font-bold text-gray-800">{item.value}</p>
-                <p className="text-sm text-gray-600 font-medium">{item.label}</p>
+          <div className="flex-1 overflow-y-auto p-3">
+            {chatList.length > 0 ? (
+              <div className="space-y-2">
+                {chatList.map((chat) => (
+                  <div
+                    key={chat._id}
+                    onClick={() => {
+                      setActiveChat(chat);
+                      loadChatMessages(chat._id);
+                    }}
+                    className="p-3 hover:bg-gray-100 rounded cursor-pointer transition"
+                  >
+                    <div className="flex items-center gap-3">
+                      {chat.participant.logoUrl && (
+                        <img src={chat.participant.logoUrl} alt="" className="w-10 h-10 rounded-full object-cover" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate">{chat.participant.name}</p>
+                        <p className="text-xs text-gray-500 truncate">{chat.lastMessage || 'No messages yet'}</p>
+                      </div>
+                      {chat.unreadCount > 0 && (
+                        <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 font-semibold">
+                          {chat.unreadCount}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
-            );
-          })}
+            ) : (
+              <div className="text-center mt-10">
+                <MessageCircle size={48} className="mx-auto text-gray-300 mb-3" />
+                <p className="text-gray-500">No conversations yet</p>
+              </div>
+            )}
+          </div>
         </div>
+      );
+    }
 
-        {/* Flow Description */}
-        <div className="mt-6 p-4 bg-blue-50 rounded">
-          <p className="text-sm text-gray-700">
-            <span className="font-semibold">Journey Flow:</span> Applications start as <span className="font-semibold text-yellow-600">Applied</span>, 
-            move to <span className="font-semibold text-blue-600">Viewed</span> when reviewed, and are then either 
-            <span className="font-semibold text-green-600"> Accepted</span> or <span className="font-semibold text-red-600">Rejected</span>.
-          </p>
+    return (
+      <div className="fixed bottom-4 right-4 w-96 bg-white shadow-2xl rounded-xl flex flex-col h-[500px] z-50 border border-gray-200">
+        <div className="flex items-center justify-between p-4 border-b bg-indigo-600 text-white rounded-t-xl">
+          <button 
+            onClick={() => {
+              setActiveChat(null);
+              setActiveChatMessages([]);
+            }}
+            className="text-white hover:bg-indigo-700 rounded px-2"
+          >
+            ← Back
+          </button>
+          <h3 className="font-semibold text-lg">
+            {activeChat.participant?.name}
+          </h3>
+          <button className="text-white font-bold hover:bg-indigo-700 rounded px-2" onClick={() => {
+            setChatOpen(false);
+            setActiveChat(null);
+            setActiveChatMessages([]);
+          }}>✕</button>
+        </div>
+        <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-gray-50">
+          {activeChatMessages.length > 0 ? (
+            activeChatMessages.map((msg, i) => (
+              <div
+                key={i}
+                className={`flex ${msg.senderType === 'incubator' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[70%] p-3 rounded-lg ${
+                    msg.senderType === 'incubator'
+                      ? 'bg-indigo-600 text-white rounded-br-none'
+                      : 'bg-white text-gray-800 rounded-bl-none shadow'
+                  }`}
+                >
+                  <p className="text-sm break-words">{msg.message}</p>
+                  <p className={`text-xs mt-1 ${msg.senderType === 'incubator' ? 'text-indigo-200' : 'text-gray-400'}`}>
+                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center mt-10">
+              <MessageCircle size={48} className="mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-500">No messages yet</p>
+            </div>
+          )}
+        </div>
+        <div className="flex p-4 border-t gap-2 bg-white rounded-b-xl">
+          <input
+            type="text"
+            className="flex-1 border rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()}
+            placeholder="Type a message..."
+          />
+          <button
+            className="px-4 py-2 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 transition"
+            onClick={sendChatMessage}
+          >
+            Send
+          </button>
         </div>
       </div>
-    </div>
-  );
-};
-
+    );
+  };
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -810,12 +1012,7 @@ const FunnelPage = () => {
           >
             Profile
           </li>
-          <li 
-            className={`cursor-pointer ${activePage === "mentors" ? "text-indigo-600 font-semibold" : "text-gray-700"} hover:text-indigo-600`} 
-            onClick={() => setActivePage("mentors")}
-          >
-            Mentors ({mentors.length})
-          </li>
+       
           <li 
             className={`cursor-pointer ${activePage === "applications" ? "text-indigo-600 font-semibold" : "text-gray-700"} hover:text-indigo-600`} 
             onClick={() => setActivePage("applications")}
@@ -829,11 +1026,28 @@ const FunnelPage = () => {
             Funnel Analytics
           </li>
         </ul>
+        
+        <div className="mt-8 pt-6 border-t">
+          <button
+            onClick={() => {
+              setChatOpen(true);
+              loadChats();
+            }}
+            className="w-full flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
+          >
+            <MessageCircle size={18} />
+            Messages
+            {chatList.filter(c => c.unreadCount > 0).length > 0 && (
+              <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-1">
+                {chatList.reduce((sum, c) => sum + c.unreadCount, 0)}
+              </span>
+            )}
+          </button>
+        </div>
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 p-6 overflow-y-auto">
-        {/* Loading Overlay */}
         {loading && (
           <div className="fixed inset-0 bg-black bg-opacity-20 flex items-center justify-center z-50">
             <div className="bg-white p-6 rounded-lg shadow-lg">
@@ -842,7 +1056,6 @@ const FunnelPage = () => {
           </div>
         )}
 
-        {/* Error/Success Messages */}
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
             {error}
@@ -860,6 +1073,7 @@ const FunnelPage = () => {
         {activePage === "applications" && <ApplicationsPage />}
         {activePage === "application-detail" && <ApplicationDetail />}
         {activePage === "funnel" && <FunnelPage />}
+        {chatOpen && <ChatBox />}
       </main>
     </div>
   );
