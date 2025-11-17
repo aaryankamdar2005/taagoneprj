@@ -13,9 +13,12 @@ const app = express();
 // Basic middleware
 app.use(cors({
   origin: ['http://localhost:5173', 'http://localhost:3001',  process.env.FRONTEND_URL,
-  process.env.PROD_FRONTEND_URL], // Add your frontend URLs
+  process.env.PROD_FRONTEND_URL], 
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],// Add your frontend URLs
   credentials: true
 }));
+
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
