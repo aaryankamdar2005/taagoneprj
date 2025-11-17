@@ -13,6 +13,8 @@ import RegistrationIncubator from "./pages/RegistrationIncubator";
 import RegistrationInvestor from "./pages/RegistrationInvestor";
 import MentorDashboard from "./pages/MentorDashboard";
 import LoginMentor from "./pages/LoginMentor";
+import IncubatorActivationDashboard from "./pages/IncubatorActivationDashboard";
+import IncubatorBulkUpload from "./pages/IncubatorBulkUpload";
 
 function App() {
   return (
@@ -32,6 +34,8 @@ function App() {
           <Route path="/register-startup" element={<RegistrationStartup/>} />
           <Route path="/register-incubator" element={<RegistrationIncubator/>} />
           <Route path="/register-investor" element={<RegistrationInvestor/>} />
+            <Route path="/incubator-activation" element={<IncubatorActivationDashboard/>} />
+              <Route path="/upload" element={<IncubatorBulkUpload/>} />
         </Routes>
       </div>
     </>

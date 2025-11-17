@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { FcGoogle } from "react-icons/fc";
 import { FaApple } from "react-icons/fa";
 import { useNavigate } from 'react-router-dom';
-
+const API = import.meta.env.VITE_API_URL;
 const LoginInvestor = () => {
   const [formData, setFormData] = useState({
     phoneNumber: '',
@@ -39,7 +39,7 @@ const LoginInvestor = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const response = await fetch(`${API}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

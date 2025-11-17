@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Users, DollarSign, BarChart3, MessageCircle, Search, ArrowLeft, CheckCircle, Clock, XCircle } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-
+const API = import.meta.env.VITE_API_URL;
 // Authenticated fetch helper - WITH ERROR DETAILS
 const fetchWithAuth = async (url, opts = {}) => {
   const token = localStorage.getItem("token");
@@ -69,8 +69,8 @@ const InvestorDashboard = () => {
     try {
       setLoading(true);
       const [dashRes, profileRes] = await Promise.all([
-        fetchWithAuth("http://localhost:5000/api/investor/dashboard"),
-        fetchWithAuth("http://localhost:5000/api/investor/profile")
+        fetchWithAuth(`${API}/api/investor/dashboard`),
+        fetchWithAuth(`${API}/api/investor/profile`)
       ]);
       setDashboard(dashRes.data || dashRes);
       setProfile(profileRes.data || profileRes);
@@ -84,7 +84,7 @@ const InvestorDashboard = () => {
   // Chat functions
   const loadChats = async () => {
     try {
-      const res = await fetchWithAuth("http://localhost:5000/api/chat/chats");
+      const res = await fetchWithAuth(`${API}/api/chat/chats`);
       setChatList((res.data || res).chats || []);
     } catch (e) {
       console.error('Error loading chats:', e);
@@ -93,7 +93,7 @@ const InvestorDashboard = () => {
 
   const openChat = async (startupId) => {
     try {
-      const res = await fetchWithAuth("http://localhost:5000/api/chat/chats", {
+      const res = await fetchWithAuth(`${API}/api/chat/chats`, {
         method: "POST",
         body: JSON.stringify({ startupId })
       });
@@ -110,7 +110,7 @@ const InvestorDashboard = () => {
 
   const loadChatMessages = async (chatId) => {
     try {
-      const res = await fetchWithAuth(`http://localhost:5000/api/chat/chats/${chatId}/messages`);
+      const res = await fetchWithAuth(`${API}/api/chat/chats/${chatId}/messages`);
       const data = res.data || res;
       setActiveChatMessages(data.messages || []);
     } catch (e) {
@@ -122,7 +122,7 @@ const InvestorDashboard = () => {
     if (!inputMessage.trim() || !activeChat) return;
     
     try {
-      await fetchWithAuth(`http://localhost:5000/api/chat/chats/${activeChat._id}/messages`, {
+      await fetchWithAuth(`${API}/api/chat/chats/${activeChat._id}/messages`, {
         method: "POST",
         body: JSON.stringify({ message: inputMessage })
       });
@@ -268,12 +268,12 @@ const InvestorDashboard = () => {
     try {
       setError("");
       setSuccessMsg("");
-      await fetchWithAuth("http://localhost:5000/api/investor/profile", {
+      await fetchWithAuth(`${API}/api/investor/profile`, {
         method: "PUT",
         body: JSON.stringify(profileForm)
       });
       
-      const profileRes = await fetchWithAuth("http://localhost:5000/api/investor/profile");
+      const profileRes = await fetchWithAuth(`${API}/api/investor/profile`);
       setProfile(profileRes.data || profileRes);
       setProfileForm({});
       
@@ -423,7 +423,7 @@ const InvestorDashboard = () => {
     try {
       setError("");
       setCurrentStartupId(startupId);
-      const res = await fetchWithAuth(`http://localhost:5000/api/investor/startups/${startupId}`);
+      const res = await fetchWithAuth(`${API}/api/investor/startups/${startupId}`);
       setStartupDetails(res.data || res);
       setActivePage("startup-view");
     } catch (err) {
@@ -443,7 +443,7 @@ const InvestorDashboard = () => {
       setError("");
       setLoading(true);
       
-      await fetchWithAuth(`http://localhost:5000/api/investor/startups/${currentStartupId}/intro-request`, {
+      await fetchWithAuth(`${API}/api/investor/startups/${currentStartupId}/intro-request`, {
         method: "POST",
         body: JSON.stringify({ notes })
       });
@@ -478,7 +478,7 @@ const InvestorDashboard = () => {
       setError("");
       setLoading(true);
       
-      await fetchWithAuth(`http://localhost:5000/api/investor/startups/${currentStartupId}/soft-commit`, {
+      await fetchWithAuth(`${API}/api/investor/startups/${currentStartupId}/soft-commit`, {
         method: "POST",
         body: JSON.stringify({
           amount: Number(amount),
@@ -715,7 +715,7 @@ const InvestorDashboard = () => {
         setError("");
         setLoading(true);
 
-        await fetchWithAuth(`http://localhost:5000/api/investor/commitments/${commitmentId}/convert`, {
+        await fetchWithAuth(`${API}/api/investor/commitments/${commitmentId}/convert`, {
           method: "POST",
           body: JSON.stringify({
             finalAmount: Number(finalAmount),
@@ -745,7 +745,7 @@ const InvestorDashboard = () => {
         setError("");
         setLoading(true);
 
-        await fetchWithAuth(`http://localhost:5000/api/investor/commitments/${commitmentId}/withdraw`, {
+        await fetchWithAuth(`${API}/api/investor/commitments/${commitmentId}/withdraw`, {
           method: "POST",
           body: JSON.stringify({ reason })
         });

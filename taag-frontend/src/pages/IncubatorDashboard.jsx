@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Users, BarChart3, Settings, Star, CheckCircle, XCircle, Eye, MessageCircle } from "lucide-react";
-
+const API = import.meta.env.VITE_API_URL;
 // Authenticated fetch helper - WITH ERROR DETAILS
 const fetchWithAuth = async (url, opts = {}) => {
   const token = localStorage.getItem("token");
@@ -67,11 +67,11 @@ const IncubatorDashboard = () => {
     try {
       setLoading(true);
       const [dashRes, profileRes, mentorsRes, appsRes, funnelRes] = await Promise.all([
-        fetchWithAuth("http://localhost:5000/api/incubator/dashboard"),
-        fetchWithAuth("http://localhost:5000/api/incubator/profile"),
-        fetchWithAuth("http://localhost:5000/api/incubator/mentors/pending"),
-        fetchWithAuth("http://localhost:5000/api/incubator/applications"),
-        fetchWithAuth("http://localhost:5000/api/incubator/analytics/funnel")
+        fetchWithAuth(`${API}/api/incubator/dashboard`),
+        fetchWithAuth(`${API}/api/incubator/profile`),
+        fetchWithAuth(`${API}/api/incubator/mentors/pending`),
+        fetchWithAuth(`${API}/api/incubator/applications`),
+        fetchWithAuth(`${API}/api/incubator/analytics/funnel`)
       ]);
 
       setDashboard(dashRes.data || dashRes);
@@ -89,7 +89,7 @@ const IncubatorDashboard = () => {
   // Chat functions
   const loadChats = async () => {
     try {
-      const res = await fetchWithAuth("http://localhost:5000/api/chat/chats");
+      const res = await fetchWithAuth(`${API}/api/chat/chats`);
       setChatList((res.data || res).chats || []);
     } catch (e) {
       console.error('Error loading chats:', e);
@@ -98,7 +98,7 @@ const IncubatorDashboard = () => {
 
   const openChat = async (startupId) => {
     try {
-      const res = await fetchWithAuth("http://localhost:5000/api/chat/chats", {
+      const res = await fetchWithAuth(`${API}/api/chat/chats`, {
         method: "POST",
         body: JSON.stringify({ startupId })
       });
@@ -115,7 +115,7 @@ const IncubatorDashboard = () => {
 
   const loadChatMessages = async (chatId) => {
     try {
-      const res = await fetchWithAuth(`http://localhost:5000/api/chat/chats/${chatId}/messages`);
+      const res = await fetchWithAuth(`${API}/api/chat/chats/${chatId}/messages`);
       const data = res.data || res;
       setActiveChatMessages(data.messages || []);
     } catch (e) {
@@ -127,7 +127,7 @@ const IncubatorDashboard = () => {
     if (!inputMessage.trim() || !activeChat) return;
     
     try {
-      await fetchWithAuth(`http://localhost:5000/api/chat/chats/${activeChat._id}/messages`, {
+      await fetchWithAuth(`${API}/api/chat/chats/${activeChat._id}/messages`, {
         method: "POST",
         body: JSON.stringify({ message: inputMessage })
       });
@@ -255,12 +255,12 @@ const IncubatorDashboard = () => {
     try {
       setError("");
       setSuccessMsg("");
-      await fetchWithAuth("http://localhost:5000/api/incubator/profile", {
+      await fetchWithAuth(`${API}/api/incubator/profile`, {
         method: "PUT",
         body: JSON.stringify(profileForm)
       });
       
-      const profileRes = await fetchWithAuth("http://localhost:5000/api/incubator/profile");
+      const profileRes = await fetchWithAuth(`${API}/api/incubator/profile`);
       setProfile(profileRes.data || profileRes);
       setProfileForm({});
       
@@ -415,14 +415,14 @@ const IncubatorDashboard = () => {
     const notes = prompt(`Add review notes for ${action} (optional):`);
     try {
       setError("");
-      await fetchWithAuth(`http://localhost:5000/api/incubator/mentors/${mentorId}/review`, {
+      await fetchWithAuth(`${API}/api/incubator/mentors/${mentorId}/review`, {
         method: "PUT",
         body: JSON.stringify({ action, reviewNotes: notes })
       });
       
       setSuccessMsg(`Mentor ${action}d successfully!`);
       
-      const mentorsRes = await fetchWithAuth("http://localhost:5000/api/incubator/mentors/pending");
+      const mentorsRes = await fetchWithAuth(`${API}/api/incubator/mentors/pending`);
       setMentors((mentorsRes.data || mentorsRes).mentors || []);
       
       setTimeout(() => setSuccessMsg(""), 3000);
@@ -491,14 +491,14 @@ const IncubatorDashboard = () => {
     const notes = prompt(`Add review notes for ${action} (optional):`);
     try {
       setError("");
-      await fetchWithAuth(`http://localhost:5000/api/incubator/applications/${applicationId}/review`, {
+      await fetchWithAuth(`${API}/api/incubator/applications/${applicationId}/review`, {
         method: "PUT",
         body: JSON.stringify({ action, reviewNotes: notes })
       });
       
       setSuccessMsg(`Application ${action}ed successfully!`);
       
-      const appsRes = await fetchWithAuth("http://localhost:5000/api/incubator/applications");
+      const appsRes = await fetchWithAuth(`${API}/api/incubator/applications`);
       setApplications((appsRes.data || appsRes).applications || []);
       
       if (action === 'accept' || action === 'reject') {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { User, CheckCircle, XCircle, Clock, Award, Briefcase, MessageCircle } from "lucide-react";
-
+const API = import.meta.env.VITE_API_URL;
 // Authenticated fetch helper - WITH ERROR DETAILS
 const fetchWithAuth = async (url, opts = {}) => {
   const token = localStorage.getItem("token");
@@ -63,8 +63,8 @@ const MentorDashboard = () => {
     try {
       setLoading(true);
       const [dashRes, profileRes] = await Promise.all([
-        fetchWithAuth("http://localhost:5000/api/mentor/dashboard"),
-        fetchWithAuth("http://localhost:5000/api/mentor/profile")
+        fetchWithAuth(`${API}/api/mentor/dashboard`),
+        fetchWithAuth(`${API}/api/mentor/profile`)
       ]);
       
       setDashboard(dashRes.data || dashRes);
@@ -79,7 +79,7 @@ const MentorDashboard = () => {
   // Chat functions
   const loadChats = async () => {
     try {
-      const res = await fetchWithAuth("http://localhost:5000/api/chat/chats");
+      const res = await fetchWithAuth(`${API}/api/chat/chats`);
       setChatList((res.data || res).chats || []);
     } catch (e) {
       console.error('Error loading chats:', e);
@@ -88,7 +88,7 @@ const MentorDashboard = () => {
 
   const openChat = async (startupId) => {
     try {
-      const res = await fetchWithAuth("http://localhost:5000/api/chat/chats", {
+      const res = await fetchWithAuth(`${API}/api/chat/chats`, {
         method: "POST",
         body: JSON.stringify({ startupId })
       });
@@ -105,7 +105,7 @@ const MentorDashboard = () => {
 
   const loadChatMessages = async (chatId) => {
     try {
-      const res = await fetchWithAuth(`http://localhost:5000/api/chat/chats/${chatId}/messages`);
+      const res = await fetchWithAuth(`${API}/api/chat/chats/${chatId}/messages`);
       const data = res.data || res;
       setActiveChatMessages(data.messages || []);
     } catch (e) {
@@ -117,7 +117,7 @@ const MentorDashboard = () => {
     if (!inputMessage.trim() || !activeChat) return;
     
     try {
-      await fetchWithAuth(`http://localhost:5000/api/chat/chats/${activeChat._id}/messages`, {
+      await fetchWithAuth(`${API}/api/chat/chats/${activeChat._id}/messages`, {
         method: "POST",
         body: JSON.stringify({ message: inputMessage })
       });
@@ -330,12 +330,12 @@ const MentorDashboard = () => {
       setSuccessMsg("");
       
       // Note: You'll need to add an update endpoint in the backend
-      await fetchWithAuth("http://localhost:5000/api/mentor/profile", {
+      await fetchWithAuth(`${API}/api/mentor/profile`, {
         method: "PUT",
         body: JSON.stringify(profileForm)
       });
       
-      const profileRes = await fetchWithAuth("http://localhost:5000/api/mentor/profile");
+      const profileRes = await fetchWithAuth(`${API}/api/mentor/profile`);
       setProfile(profileRes.data || profileRes);
       setProfileForm({});
       

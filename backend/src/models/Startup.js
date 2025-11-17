@@ -11,22 +11,22 @@ const startupSchema = new mongoose.Schema({
   companyName: { type: String, required: true },
   website: String,
   logoUrl: String,
-  oneLineDescription: { type: String, required: true },
+  oneLineDescription: String, // ✅ Made optional since bulk import might not have it
   
   industry: {
     type: String,
     enum: [
       'Technology', 'Healthcare', 'Finance', 'Education', 'E-commerce',
       'Real Estate', 'Entertainment', 'Transportation', 'Energy',
-      'Agriculture', 'Manufacturing', 'Other'
+      'Agriculture', 'Manufacturing', 'Other', 'Not specified' // ✅ Added for bulk import
     ],
-    required: true
+    default: 'Not specified' // ✅ Added default
   },
   
   stage: {
     type: String,
     enum: ['idea', 'mvp', 'early-revenue', 'growth', 'scale'],
-    required: true
+    default: 'idea' // ✅ Added default
   },
   
   // 60-Second Pitch
@@ -42,7 +42,7 @@ const startupSchema = new mongoose.Schema({
     },
     writtenPitch: {
       type: String,
-      maxlength: 300 // 2-3 sentences max
+      maxlength: 300
     }
   },
   
@@ -50,34 +50,34 @@ const startupSchema = new mongoose.Schema({
   fundingAsk: {
     amount: {
       type: Number,
-      enum: [2500000, 5000000, 10000000, 20000000, 50000000, 100000000],
-      required: true
+      // ✅ Removed enum to allow any amount from bulk import
+      default: 0
     },
     timeline: {
       type: String,
-      enum: ['Immediate', '1-3 months', '3-6 months', '6+ months'],
-      required: true
+      enum: ['Immediate', '1-3 months', '3-6 months', '6+ months', 'Not specified'],
+      default: 'Not specified'
     },
-    useOfFunds: { type: String, required: true }
+    useOfFunds: String
   },
   
   // Key Numbers
   metrics: {
-    monthlyRevenue: Number,
+    monthlyRevenue: { type: Number, default: 0 },
     growthRate: String,
-    customerCount: Number,
-    teamSize: Number
+    customerCount: { type: Number, default: 0 },
+    teamSize: { type: Number, default: 0 }
   },
   
   // Market & Traction
   marketInfo: {
     marketSize: String,
-    keyTractionPoints: { type: String, required: true }
+    keyTractionPoints: String
   },
   
   // Fundraising Tracker
   fundraisingTracker: {
-    totalTarget: Number,
+    totalTarget: { type: Number, default: 0 },
     totalRaised: { type: Number, default: 0 },
     totalCommitted: { type: Number, default: 0 },
     investorsCount: { type: Number, default: 0 },
@@ -116,6 +116,29 @@ const startupSchema = new mongoose.Schema({
     completedDate: Date,
     createdBy: String
   }],
+  
+  // ✅ Bulk Import Fields
+  verifiedBy: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Incubator'
+  }],
+  importedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Incubator'
+  },
+  importedAt: Date,
+  
+  // ✅ Additional fields for bulk import
+  email: String,
+  phone: String,
+  founders: String,
+  location: String,
+  description: String,
+  activated: { type: Boolean, default: false },
+activationToken: String,
+activationTokenExpiry: Date,
+tempPassword: String,
+lastLoginAt: Date,
   
   isPublic: { type: Boolean, default: true }
 }, { timestamps: true });

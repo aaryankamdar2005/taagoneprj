@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Users, DollarSign, BarChart3, Calendar, FileText, Building2, CheckCircle2, MessageCircle } from "lucide-react";
-
+const API = import.meta.env.VITE_API_URL;
 // Authenticated fetch helper - WITH ERROR DETAILS
 const fetchWithAuth = async (url, opts = {}) => {
   const token = localStorage.getItem("token");
@@ -69,12 +69,12 @@ const StartupDashboard = () => {
   const loadData = async () => {
     try {
       const [dashRes, pitchRes, introsRes, commitsRes, incubsRes, appsRes] = await Promise.all([
-        fetchWithAuth("http://localhost:5000/api/startup/dashboard"),
-        fetchWithAuth("http://localhost:5000/api/startup/pitch"),
-        fetchWithAuth("http://localhost:5000/api/startup/intro-requests"),
-        fetchWithAuth("http://localhost:5000/api/startup/soft-commitments"),
-        fetchWithAuth("http://localhost:5000/api/startup/incubators"),
-        fetchWithAuth("http://localhost:5000/api/startup/applications")
+        fetchWithAuth(`${API}/api/startup/dashboard`),
+        fetchWithAuth(`${API}/api/startup/pitch`),
+        fetchWithAuth(`${API}/api/startup/intro-requests`),
+        fetchWithAuth(`${API}/api/startup/soft-commitments`),
+        fetchWithAuth(`${API}/api/startup/incubators`),
+        fetchWithAuth(`${API}/api/startup/applications`)
       ]);
       
       setDashboard(dashRes.data || dashRes);
@@ -92,7 +92,7 @@ const StartupDashboard = () => {
   // Chat functions
   const loadChats = async () => {
     try {
-      const res = await fetchWithAuth("http://localhost:5000/api/chat/chats");
+      const res = await fetchWithAuth(`${API}/api/chat/chats`);
       setChatList((res.data || res).chats || []);
     } catch (e) {
       console.error('Error loading chats:', e);
@@ -101,7 +101,7 @@ const StartupDashboard = () => {
 
   const openChat = async (investorId) => {
     try {
-      const res = await fetchWithAuth("http://localhost:5000/api/chat/chats", {
+      const res = await fetchWithAuth(`${API}/api/chat/chats`, {
         method: "POST",
         body: JSON.stringify({ investorId })
       });
@@ -115,29 +115,27 @@ const StartupDashboard = () => {
       setError("Could not open chat: " + (e.message || String(e)));
     }
   };
-  // Open chat with incubator
-const openChatWithIncubator = async (incubatorId) => {
-  try {
-    const res = await fetchWithAuth("http://localhost:5000/api/chat/chats", {
-      method: "POST",
-      body: JSON.stringify({ incubatorId })
-    });
-    
-    const chat = res.data || res;
-    setActiveChat(chat);
-    await loadChatMessages(chat._id);
-    setChatOpen(true);
-    await loadChats();
-  } catch (e) {
-    setError("Could not open chat: " + (e.message || String(e)));
-  }
-};
 
-
+  const openChatWithIncubator = async (incubatorId) => {
+    try {
+      const res = await fetchWithAuth(`${API}/api/chat/chats`, {
+        method: "POST",
+        body: JSON.stringify({ incubatorId })
+      });
+      
+      const chat = res.data || res;
+      setActiveChat(chat);
+      await loadChatMessages(chat._id);
+      setChatOpen(true);
+      await loadChats();
+    } catch (e) {
+      setError("Could not open chat: " + (e.message || String(e)));
+    }
+  };
 
   const loadChatMessages = async (chatId) => {
     try {
-      const res = await fetchWithAuth(`http://localhost:5000/api/chat/chats/${chatId}/messages`);
+      const res = await fetchWithAuth(`${API}/api/chat/chats/${chatId}/messages`);
       const data = res.data || res;
       setActiveChatMessages(data.messages || []);
     } catch (e) {
@@ -149,7 +147,7 @@ const openChatWithIncubator = async (incubatorId) => {
     if (!inputMessage.trim() || !activeChat) return;
     
     try {
-      await fetchWithAuth(`http://localhost:5000/api/chat/chats/${activeChat._id}/messages`, {
+      await fetchWithAuth(`${API}/api/chat/chats/${activeChat._id}/messages`, {
         method: "POST",
         body: JSON.stringify({ message: inputMessage })
       });
@@ -250,7 +248,7 @@ const openChatWithIncubator = async (incubatorId) => {
     try {
       setError("");
       setSuccessMsg("");
-      await fetchWithAuth("http://localhost:5000/api/startup/pitch", { 
+      await fetchWithAuth(`${API}/api/startup/pitch`, { 
         method: "PUT", 
         body: JSON.stringify(pitchForm) 
       });
@@ -316,7 +314,7 @@ const openChatWithIncubator = async (incubatorId) => {
   const addTask = async () => {
     try {
       setError("");
-      const saved = await fetchWithAuth("http://localhost:5000/api/startup/tasks", { 
+      const saved = await fetchWithAuth(`${API}/api/startup/tasks`, { 
         method: "POST", 
         body: JSON.stringify(taskForm) 
       });
@@ -332,7 +330,7 @@ const openChatWithIncubator = async (incubatorId) => {
   const updateTaskStatus = async (taskId, status) => {
     try {
       setError("");
-      await fetchWithAuth(`http://localhost:5000/api/startup/tasks/${taskId}`, { 
+      await fetchWithAuth(`${API}/api/startup/tasks/${taskId}`, { 
         method: "PUT", 
         body: JSON.stringify({ status }) 
       });
@@ -441,14 +439,14 @@ const openChatWithIncubator = async (incubatorId) => {
     </div>
   );
 
-  // Intro Requests Section with Chat
+  // Intro Requests Section
   const respondToIntro = async (requestId, status, meetingDate = null) => {
     try {
       setError("");
       const body = { status };
       if (meetingDate) body.meetingDate = meetingDate;
       
-      await fetchWithAuth(`http://localhost:5000/api/startup/intro-requests/${requestId}`, {
+      await fetchWithAuth(`${API}/api/startup/intro-requests/${requestId}`, {
         method: "PUT",
         body: JSON.stringify(body)
       });
@@ -543,7 +541,7 @@ const openChatWithIncubator = async (incubatorId) => {
     </div>
   );
 
-  // Soft Commitments Section with Chat
+  // Soft Commitments Section
   const respondToCommitment = async (commitmentId, action) => {
     try {
       setError("");
@@ -560,12 +558,12 @@ const openChatWithIncubator = async (incubatorId) => {
         if (notes) body.responseNotes = notes;
       }
 
-      await fetchWithAuth(`http://localhost:5000/api/startup/soft-commitments/${commitmentId}`, {
+      await fetchWithAuth(`${API}/api/startup/soft-commitments/${commitmentId}`, {
         method: "PUT",
         body: JSON.stringify(body)
       });
       
-      const commitsRes = await fetchWithAuth("http://localhost:5000/api/startup/soft-commitments");
+      const commitsRes = await fetchWithAuth(`${API}/api/startup/soft-commitments`);
       setCommitments((commitsRes.data || commitsRes).commitments || []);
       
       setSuccessMsg(`Commitment ${action}ed successfully!`);
@@ -668,7 +666,7 @@ const openChatWithIncubator = async (incubatorId) => {
     </div>
   );
 
-  // Incubators Section
+  // Incubators Section - COMPLETE WITH FORM
   const handleApplicationChange = (e) => {
     const { name, value } = e.target;
     setApplicationForm({ ...applicationForm, [name]: value });
@@ -677,7 +675,7 @@ const openChatWithIncubator = async (incubatorId) => {
   const applyToIncubator = async (incubatorId) => {
     try {
       setError("");
-      await fetchWithAuth(`http://localhost:5000/api/startup/incubators/${incubatorId}/apply`, {
+      await fetchWithAuth(`${API}/api/startup/incubators/${incubatorId}/apply`, {
         method: "POST",
         body: JSON.stringify(applicationForm)
       });
@@ -685,7 +683,7 @@ const openChatWithIncubator = async (incubatorId) => {
       setSelectedIncubator(null);
       setApplicationForm({});
       
-      const appsRes = await fetchWithAuth("http://localhost:5000/api/startup/applications");
+      const appsRes = await fetchWithAuth(`${API}/api/startup/applications`);
       setApplications((appsRes.data || appsRes).applications || []);
       
       setSuccessMsg("Application submitted successfully!");
@@ -695,75 +693,166 @@ const openChatWithIncubator = async (incubatorId) => {
     }
   };
 
- // Update the IncubatorsSection to include chat button
-const IncubatorsSection = () => (
-  <div>
-    <h2 className="text-2xl font-semibold mb-4">Available Incubators</h2>
-    
-    {selectedIncubator ? (
-      // ... existing application form code ...
-      <div className="bg-white p-6 rounded-xl shadow">
-        {/* ... existing form ... */}
-      </div>
-    ) : (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {incubators.map((incubator) => (
-          <div key={incubator._id} className="bg-white p-6 rounded-xl shadow">
-            <div className="flex items-start gap-4 mb-4">
-              {incubator.logoUrl && (
-                <img
-                  src={incubator.logoUrl}
-                  alt={incubator.incubatorName}
-                  className="w-16 h-16 object-cover rounded"
-                />
-              )}
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold">{incubator.incubatorName}</h3>
-                <p className="text-sm text-gray-600">{incubator.location}</p>
+  const IncubatorsSection = () => (
+    <div>
+      <h2 className="text-2xl font-semibold mb-4">Available Incubators</h2>
+      
+      {selectedIncubator ? (
+        // APPLICATION FORM
+        <div className="bg-white p-6 rounded-xl shadow">
+          <button
+            onClick={() => {
+              setSelectedIncubator(null);
+              setApplicationForm({});
+            }}
+            className="text-indigo-600 hover:underline mb-4 flex items-center gap-2"
+          >
+            ← Back to Incubators
+          </button>
+
+          <h3 className="text-xl font-semibold mb-4">Apply to {selectedIncubator.incubatorName}</h3>
+          
+          <form onSubmit={(e) => { e.preventDefault(); applyToIncubator(selectedIncubator._id); }} className="space-y-4">
+            <div>
+              <label className="block font-semibold mb-1">Why do you want to join this program? *</label>
+              <textarea
+                name="whyJoinProgram"
+                value={applicationForm.whyJoinProgram || ""}
+                onChange={handleApplicationChange}
+                className="border border-gray-300 p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                rows="3"
+                required
+                placeholder="Explain your motivation..."
+              />
+            </div>
+
+            <div>
+              <label className="block font-semibold mb-1">Expected Outcomes</label>
+              <textarea
+                name="expectedOutcomes"
+                value={applicationForm.expectedOutcomes || ""}
+                onChange={handleApplicationChange}
+                className="border border-gray-300 p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                rows="3"
+                placeholder="What do you hope to achieve?"
+              />
+            </div>
+
+            <div>
+              <label className="block font-semibold mb-1">Current Challenges</label>
+              <textarea
+                name="currentChallenges"
+                value={applicationForm.currentChallenges || ""}
+                onChange={handleApplicationChange}
+                className="border border-gray-300 p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                rows="3"
+                placeholder="What challenges are you facing?"
+              />
+            </div>
+
+            <div>
+              <label className="block font-semibold mb-1">Funding Needs</label>
+              <input
+                type="text"
+                name="fundingNeeds"
+                value={applicationForm.fundingNeeds || ""}
+                onChange={handleApplicationChange}
+                className="border border-gray-300 p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="e.g., ₹50,00,000 for product development"
+              />
+            </div>
+
+            <div>
+              <label className="block font-semibold mb-1">Time Commitment Available</label>
+              <input
+                type="text"
+                name="timeCommitment"
+                value={applicationForm.timeCommitment || ""}
+                onChange={handleApplicationChange}
+                className="border border-gray-300 p-2 w-full rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="e.g., Full-time, 20 hours/week"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <button
+                type="submit"
+                className="px-6 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
+              >
+                Submit Application
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedIncubator(null);
+                  setApplicationForm({});
+                }}
+                className="px-6 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : (
+        // INCUBATORS LIST
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {incubators.map((incubator) => (
+            <div key={incubator._id} className="bg-white p-6 rounded-xl shadow">
+              <div className="flex items-start gap-4 mb-4">
+                {incubator.logoUrl && (
+                  <img
+                    src={incubator.logoUrl}
+                    alt={incubator.incubatorName}
+                    className="w-16 h-16 object-cover rounded"
+                  />
+                )}
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold">{incubator.incubatorName}</h3>
+                  <p className="text-sm text-gray-600">{incubator.location}</p>
+                </div>
+              </div>
+              
+              <p className="text-sm text-gray-700 mb-4">{incubator.description}</p>
+              
+              <div className="space-y-2 mb-4 text-sm">
+                {incubator.programDetails?.duration && (
+                  <p><span className="font-semibold">Duration:</span> {incubator.programDetails.duration}</p>
+                )}
+                {incubator.programDetails?.equityTaken && (
+                  <p><span className="font-semibold">Equity:</span> {incubator.programDetails.equityTaken}%</p>
+                )}
+                {incubator.programDetails?.investmentAmount && (
+                  <p><span className="font-semibold">Investment:</span> ₹{incubator.programDetails.investmentAmount.toLocaleString()}</p>
+                )}
+              </div>
+
+              <div className="flex gap-4 text-sm text-gray-600 mb-4">
+                <span>{incubator.stats?.activeStartups || 0} Startups</span>
+                <span>{incubator.stats?.activeMentors || 0} Mentors</span>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSelectedIncubator(incubator)}
+                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
+                >
+                  Apply Now
+                </button>
+                <button
+                  onClick={() => openChatWithIncubator(incubator._id)}
+                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition flex items-center gap-1"
+                >
+                  <MessageCircle size={16} />
+                  Chat
+                </button>
               </div>
             </div>
-            
-            <p className="text-sm text-gray-700 mb-4">{incubator.description}</p>
-            
-            <div className="space-y-2 mb-4 text-sm">
-              {incubator.programDetails?.duration && (
-                <p><span className="font-semibold">Duration:</span> {incubator.programDetails.duration}</p>
-              )}
-              {incubator.programDetails?.equityTaken && (
-                <p><span className="font-semibold">Equity:</span> {incubator.programDetails.equityTaken}%</p>
-              )}
-              {incubator.programDetails?.investmentAmount && (
-                <p><span className="font-semibold">Investment:</span> ₹{incubator.programDetails.investmentAmount.toLocaleString()}</p>
-              )}
-            </div>
-
-            <div className="flex gap-4 text-sm text-gray-600 mb-4">
-              <span>{incubator.stats?.activeStartups || 0} Startups</span>
-              <span>{incubator.stats?.activeMentors || 0} Mentors</span>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => setSelectedIncubator(incubator)}
-                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
-              >
-                Apply Now
-              </button>
-              <button
-                onClick={() => openChatWithIncubator(incubator._id)}
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition flex items-center gap-1"
-              >
-                <MessageCircle size={16} />
-                Chat
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    )}
-  </div>
-);
-
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   // Applications Section
   const ApplicationsSection = () => (
@@ -811,6 +900,16 @@ const IncubatorsSection = () => (
                   </div>
                 )}
 
+                {(app.status === "accepted" || app.status === "under-review") && (
+                  <button
+                    onClick={() => openChatWithIncubator(app.incubator._id)}
+                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-sm flex items-center gap-1 mb-3"
+                  >
+                    <MessageCircle size={16} />
+                    Chat with Incubator
+                  </button>
+                )}
+
                 {app.applicationData && (
                   <details className="text-sm">
                     <summary className="cursor-pointer font-semibold mb-2">View Application Details</summary>
@@ -837,7 +936,7 @@ const IncubatorsSection = () => (
     </div>
   );
 
-  // Chat Component with auto-refresh
+  // Chat Component
   const ChatBox = () => {
     useEffect(() => {
       if (chatOpen && !activeChat) {
@@ -878,6 +977,9 @@ const IncubatorsSection = () => (
                     className="p-3 hover:bg-gray-100 rounded cursor-pointer transition"
                   >
                     <div className="flex items-center gap-3">
+                      {chat.participant.logoUrl && (
+                        <img src={chat.participant.logoUrl} alt="" className="w-10 h-10 rounded-full object-cover" />
+                      )}
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-sm truncate">{chat.participant.name}</p>
                         <p className="text-xs text-gray-500 truncate">{chat.lastMessage || 'No messages yet'}</p>
