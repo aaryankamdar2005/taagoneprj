@@ -28,8 +28,7 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Ensure phoneNumber index exists
-userSchema.index({ phoneNumber: 1 }, { unique: true });
+// Unique index is already ensured via the schema path option
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {

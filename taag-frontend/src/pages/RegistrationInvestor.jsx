@@ -45,7 +45,7 @@ const RegistrationInvestor = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          phoneNumber: Number(formData.phoneNumber), // ensure number
+          phoneNumber: formData.phoneNumber,
           password: formData.password,
           userType: 'investor'
         })

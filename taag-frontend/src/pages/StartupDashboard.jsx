@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Users, DollarSign, BarChart3, Calendar, FileText, Building2, CheckCircle2, MessageCircle } from "lucide-react";
+import { Users, IndianRupee, BarChart3, Calendar, FileText, Building2, CheckCircle2, MessageCircle } from "lucide-react";
 const API = import.meta.env.VITE_API_URL;
 // Authenticated fetch helper - WITH ERROR DETAILS
 const fetchWithAuth = async (url, opts = {}) => {
@@ -49,6 +49,10 @@ const StartupDashboard = () => {
   const [commitments, setCommitments] = useState([]);
   const [incubators, setIncubators] = useState([]);
   const [applications, setApplications] = useState([]);
+  // Section filters
+  const [introFilter, setIntroFilter] = useState("all");
+  const [commitmentFilter, setCommitmentFilter] = useState("all");
+  const [applicationFilter, setApplicationFilter] = useState("all");
   const [selectedIncubator, setSelectedIncubator] = useState(null);
   const [applicationForm, setApplicationForm] = useState({});
   const [error, setError] = useState("");
@@ -166,7 +170,7 @@ const StartupDashboard = () => {
       <h2 className="text-2xl font-semibold mb-6">Startup Overview</h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white p-6 rounded-xl shadow flex items-center space-x-4">
-          <DollarSign className="text-green-500 w-8 h-8" />
+          <IndianRupee className="text-green-500 w-8 h-8" />
           <div>
             <p className="text-gray-500">Funding Raised</p>
             <h3 className="text-xl font-bold">₹{(dashboard.fundraisingTracker?.totalRaised || 0).toLocaleString()}</h3>
@@ -465,9 +469,38 @@ const StartupDashboard = () => {
     <div>
       <h2 className="text-2xl font-semibold mb-4">Intro Requests</h2>
       <div className="bg-white p-6 rounded-xl shadow">
+        {/* Filters */}
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-sm text-gray-600">Filter:</span>
+          <button
+            className={`px-3 py-1 rounded text-sm border ${introFilter === 'all' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300'}`}
+            onClick={() => setIntroFilter('all')}
+          >
+            All
+          </button>
+          <button
+            className={`px-3 py-1 rounded text-sm border ${introFilter === 'approved' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300'}`}
+            onClick={() => setIntroFilter('approved')}
+          >
+            Approved
+          </button>
+          <button
+            className={`px-3 py-1 rounded text-sm border ${introFilter === 'not-interested' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300'}`}
+            onClick={() => setIntroFilter('not-interested')}
+          >
+            Not Interested
+          </button>
+        </div>
         {intros.length > 0 ? (
           <div className="space-y-4">
-            {intros.map((intro) => (
+            {intros
+              .filter((intro) => {
+                if (introFilter === 'all') return true;
+                if (introFilter === 'approved') return intro.status === 'approved';
+                if (introFilter === 'not-interested') return intro.status === 'declined';
+                return true;
+              })
+              .map((intro) => (
               <div key={intro._id} className="border border-gray-200 p-4 rounded-lg">
                 <div className="flex justify-between items-start mb-3">
                   <div>
@@ -483,7 +516,7 @@ const StartupDashboard = () => {
                     intro.status === "declined" ? "bg-red-100 text-red-700" :
                     "bg-blue-100 text-blue-700"
                   }`}>
-                    {intro.status}
+                    {intro.status === 'declined' ? 'not-interested' : intro.status}
                   </span>
                 </div>
                 
@@ -514,7 +547,7 @@ const StartupDashboard = () => {
                       onClick={() => respondToIntro(intro._id, "declined")}
                       className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition text-sm"
                     >
-                      Decline
+                      Not Interested
                     </button>
                     <button
                       onClick={() => openChat(intro.investorId)}
@@ -577,6 +610,28 @@ const StartupDashboard = () => {
     <div>
       <h2 className="text-2xl font-semibold mb-4">Soft Commitments</h2>
       <div className="bg-white p-6 rounded-xl shadow">
+        {/* Filters */}
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-sm text-gray-600">Filter:</span>
+          <button
+            className={`px-3 py-1 rounded text-sm border ${commitmentFilter === 'all' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300'}`}
+            onClick={() => setCommitmentFilter('all')}
+          >
+            All
+          </button>
+          <button
+            className={`px-3 py-1 rounded text-sm border ${commitmentFilter === 'converted' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300'}`}
+            onClick={() => setCommitmentFilter('converted')}
+          >
+            Converted
+          </button>
+          <button
+            className={`px-3 py-1 rounded text-sm border ${commitmentFilter === 'withdrawn' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300'}`}
+            onClick={() => setCommitmentFilter('withdrawn')}
+          >
+            Withdrawn
+          </button>
+        </div>
         {commitments.length > 0 ? (
           <>
             <div className="mb-6 p-4 bg-indigo-50 rounded-lg">
@@ -588,7 +643,14 @@ const StartupDashboard = () => {
               </p>
             </div>
             <div className="space-y-4">
-              {commitments.map((commit) => (
+              {commitments
+                .filter((commit) => {
+                  if (commitmentFilter === 'all') return true;
+                  if (commitmentFilter === 'converted') return commit.status === 'converted';
+                  if (commitmentFilter === 'withdrawn') return commit.status === 'withdrawn';
+                  return true;
+                })
+                .map((commit) => (
                 <div key={commit._id} className="border border-gray-200 p-4 rounded-lg">
                   <div className="flex justify-between items-start mb-3">
                     <div>
@@ -604,6 +666,7 @@ const StartupDashboard = () => {
                     <span className={`px-3 py-1 rounded text-sm ${
                       commit.status === "active" ? "bg-green-100 text-green-700" :
                       commit.status === "converted" ? "bg-blue-100 text-blue-700" :
+                      commit.status === "withdrawn" ? "bg-red-100 text-red-700" :
                       "bg-gray-100 text-gray-700"
                     }`}>
                       {commit.status}
@@ -859,9 +922,38 @@ const StartupDashboard = () => {
     <div>
       <h2 className="text-2xl font-semibold mb-4">My Applications</h2>
       <div className="bg-white p-6 rounded-xl shadow">
+        {/* Filters */}
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-sm text-gray-600">Filter:</span>
+          <button
+            className={`px-3 py-1 rounded text-sm border ${applicationFilter === 'all' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300'}`}
+            onClick={() => setApplicationFilter('all')}
+          >
+            All
+          </button>
+          <button
+            className={`px-3 py-1 rounded text-sm border ${applicationFilter === 'closed-deal' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300'}`}
+            onClick={() => setApplicationFilter('closed-deal')}
+          >
+            Closed Deal
+          </button>
+          <button
+            className={`px-3 py-1 rounded text-sm border ${applicationFilter === 'not-interested' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300'}`}
+            onClick={() => setApplicationFilter('not-interested')}
+          >
+            Not Interested
+          </button>
+        </div>
         {applications.length > 0 ? (
           <div className="space-y-4">
-            {applications.map((app) => (
+            {applications
+              .filter((app) => {
+                if (applicationFilter === 'all') return true;
+                if (applicationFilter === 'closed-deal') return app.status === 'closed-deal';
+                if (applicationFilter === 'not-interested') return app.status === 'rejected' || app.status === 'not-interested';
+                return true;
+              })
+              .map((app) => (
               <div key={app._id} className="border border-gray-200 p-4 rounded-lg">
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex items-center gap-3">
@@ -881,10 +973,11 @@ const StartupDashboard = () => {
                     app.status === "applied" ? "bg-yellow-100 text-yellow-700" :
                     app.status === "under-review" ? "bg-blue-100 text-blue-700" :
                     app.status === "accepted" ? "bg-green-100 text-green-700" :
+                    app.status === "closed-deal" ? "bg-green-100 text-green-700" :
                     app.status === "rejected" ? "bg-red-100 text-red-700" :
                     "bg-gray-100 text-gray-700"
                   }`}>
-                    {app.status}
+                    {app.status === 'rejected' ? 'not-interested' : app.status}
                   </span>
                 </div>
 
@@ -1085,10 +1178,10 @@ const StartupDashboard = () => {
           <ul className="space-y-2">
             {[
               { id: "dashboard", label: "Dashboard", icon: BarChart3 },
-              { id: "pitch", label: "Investor Pitch", icon: FileText },
+              { id: "pitch", label: "Elevator Pitch", icon: FileText },
               { id: "tasks", label: "Tasks", icon: CheckCircle2 },
               { id: "intros", label: "Intro Requests", icon: Users },
-              { id: "commitments", label: "Soft Commitments", icon: DollarSign },
+              { id: "commitments", label: "Soft Commitments", icon: IndianRupee },
               { id: "incubators", label: "Incubators", icon: Building2 },
               { id: "applications", label: "My Applications", icon: Calendar }
             ].map((item) => {

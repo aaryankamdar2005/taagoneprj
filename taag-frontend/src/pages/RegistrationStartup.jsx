@@ -23,9 +23,9 @@ const RegistrationStartup = () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          phoneNumber: Number(formData.phoneNumber), // ensure number
+          phoneNumber: formData.phoneNumber,
           password: formData.password,
-          userType: "startup", // fixed for startup registration
+          userType: "startup",
         }),
       });
 
@@ -35,8 +35,15 @@ const RegistrationStartup = () => {
       }
 
       const data = await res.json();
-      console.log("✅ Registration success:", data);
-      alert("Registration successful!");
+      if (res.ok && data.success) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('userType', data.user.userType);
+        localStorage.setItem('userId', data.user.id);
+        localStorage.setItem('phoneNumber', data.user.phoneNumber);
+        window.location.href = '/startup/';
+      } else {
+        throw new Error(data.message || "Registration failed");
+      }
     } catch (err) {
       console.error("❌ Registration error:", err);
       alert(err.message);
@@ -44,50 +51,41 @@ const RegistrationStartup = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white p-6 rounded-2xl shadow-md w-full max-w-sm space-y-4"
-      >
-        <h2 className="text-xl font-semibold text-center">Startup Registration</h2>
+    <div className="h-screen flex items-center justify-center bg-gray-100">
+      <div className="bg-white shadow-xl rounded-xl p-10 w-full max-w-md">
+        <h2 className="text-3xl font-bold mb-6 text-center text-gray-800">Startup Registration</h2>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Phone Number
-          </label>
+        <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
           <input
-            type="text"
+            type="tel"
             name="phoneNumber"
-            placeholder="Enter phone number"
             value={formData.phoneNumber}
             onChange={handleChange}
-            className="w-full border border-gray-300 p-2 rounded-lg mt-1"
+            placeholder="Enter your mobile number"
+            className="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 placeholder-gray-400"
+            maxLength="10"
+            pattern="[0-9]{10}"
             required
           />
-        </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Password
-          </label>
           <input
             type="password"
             name="password"
-            placeholder="Enter password"
             value={formData.password}
             onChange={handleChange}
-            className="w-full border border-gray-300 p-2 rounded-lg mt-1"
+            placeholder="Enter your password"
+            className="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 placeholder-gray-400"
             required
           />
-        </div>
 
-        <button
-          type="submit"
-          className="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition"
-        >
-          Register
-        </button>
-      </form>
+          <button
+            type="submit"
+            className="bg-yellow-400 text-black font-semibold py-3 rounded-lg hover:bg-yellow-500 transition"
+          >
+            Register
+          </button>
+        </form>
+      </div>
     </div>
   );
 };

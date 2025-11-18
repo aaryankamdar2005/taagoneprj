@@ -135,7 +135,7 @@ const LoginIncubator = () => {
 
         <p className="mt-6 text-center text-gray-500">
           Don't have an account?{" "}
-          <a href="/incubator/signup" className="text-yellow-400 font-medium hover:underline">
+          <a href="/register-incubator" className="text-yellow-400 font-medium hover:underline">
             Sign Up
           </a>
         </p>

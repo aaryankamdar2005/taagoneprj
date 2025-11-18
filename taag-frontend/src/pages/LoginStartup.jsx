@@ -135,7 +135,7 @@ function LoginStartup() {
 
         <p className="mt-6 text-center text-gray-500">
           Don't have an account?{" "}
-          <a href="/startup/signup" className="text-yellow-400 font-medium hover:underline">
+          <a href="/register-startup" className="text-yellow-400 font-medium hover:underline">
             Sign Up
           </a>
         </p>

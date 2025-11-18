@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const morgan = require('morgan');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -10,8 +11,12 @@ const mentorRoutes = require('./routes/mentor');
 const chatRoutes = require('./routes/chat');
 
 const app = express();
+// Request logging middleware
+app.use(morgan('dev'));
 
-// CORS Configuration
+
+
+// CORS Configuration 
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3001',

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Users, DollarSign, BarChart3, MessageCircle, Search, ArrowLeft, CheckCircle, Clock, XCircle } from "lucide-react";
+import { Users, IndianRupee, BarChart3, MessageCircle, Search, ArrowLeft, CheckCircle, Clock, XCircle } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 const API = import.meta.env.VITE_API_URL;
 // Authenticated fetch helper - WITH ERROR DETAILS
@@ -175,7 +175,7 @@ const InvestorDashboard = () => {
         <h2 className="text-2xl font-semibold mb-6">Investor Overview</h2>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
           <div className="bg-white p-6 rounded-xl shadow flex items-center space-x-4">
-            <DollarSign className="text-green-500 w-8 h-8" />
+            <IndianRupee className="text-green-500 w-8 h-8" />
             <div>
               <p className="text-gray-500">Total Invested</p>
               <h3 className="text-xl font-bold">₹{(dashboard.portfolio?.totalInvested || 0).toLocaleString()}</h3>
